@@ -688,13 +688,8 @@ function renderCreateOrg() {
         plan:      'free',
       });
 
-      // 2. Create default "Pool" inventory location
-      await window._setDoc(`tenants/${tenantId}/owners`, 'POOL', {
-        name: 'Pool',
-        type: 'pool',
-      });
-
-      // 3. Update user profile with tenant + admin role
+      // 2. Update user profile with tenantId FIRST — rules need this before we
+      //    can write to tenant subcollections
       const profile = {
         displayName: S.profile.displayName,
         email:       S.profile.email,
@@ -704,6 +699,12 @@ function renderCreateOrg() {
         createdAt:   S.profile.createdAt,
       };
       await window._setDoc('users', uid, profile);
+
+      // 3. Create default "Pool" inventory location
+      await window._setDoc(`tenants/${tenantId}/owners`, 'POOL', {
+        name: 'Pool',
+        type: 'pool',
+      });
 
       // 4. Mirror user into tenant's users subcollection (for admin panel later)
       await window._setDoc(`tenants/${tenantId}/users`, uid, {
