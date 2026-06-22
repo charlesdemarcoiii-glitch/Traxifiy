@@ -1,1 +1,992 @@
-hello
+<!DOCTYPE html><!-- Traxify v1.0 — Step 2: Auth + Onboarding -->
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Traxify" />
+  <meta name="description" content="Inventory tracking for teams" />
+  <title>Traxify</title>
+
+  <!-- ── FIREBASE (ES Module) ─────────────────────────────────────────────── -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+    import {
+      getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword,
+      sendPasswordResetEmail, signOut, onAuthStateChanged
+    } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+    import {
+      getFirestore, doc, getDoc, setDoc, collection,
+      addDoc, updateDoc, getDocs
+    } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+    // Import the functions you need from the SDKs you need
+
+import { initializeApp } from "firebase/app";
+
+// TODO: Add SDKs for Firebase products that you want to use
+
+// https://firebase.google.com/docs/web/setup#available-libraries
+
+
+// Your web app's Firebase configuration
+
+const firebaseConfig = {
+
+  apiKey: "AIzaSyBIB1f69foJb4Svw15T4yv8KV4uzjC66_M",
+
+  authDomain: "traxify-45545.firebaseapp.com",
+
+  projectId: "traxify-45545",
+
+  storageBucket: "traxify-45545.firebasestorage.app",
+
+  messagingSenderId: "341961978716",
+
+  appId: "1:341961978716:web:efca65de5f8a80f44e4799"
+
+};
+
+
+// Initialize Firebase
+
+const app = initializeApp(firebaseConfig); 
+
+    };
+    // ─────────────────────────────────────────────────────────────────────────
+
+    const firebaseApp = initializeApp(firebaseConfig);
+    const auth        = getAuth(firebaseApp);
+    const db          = getFirestore(firebaseApp);
+
+    // Auth helpers
+    window._signIn   = (e, p) => signInWithEmailAndPassword(auth, e, p);
+    window._signUp   = (e, p) => createUserWithEmailAndPassword(auth, e, p);
+    window._resetPw  = (e)    => sendPasswordResetEmail(auth, e);
+    window._signOut  = ()     => signOut(auth);
+    window._onAuth   = (cb)   => onAuthStateChanged(auth, cb);
+
+    // Firestore helpers
+    window._getDoc = async (path, id) => {
+      const snap = await getDoc(doc(db, path, id));
+      return snap.exists() ? { _id: snap.id, ...snap.data() } : null;
+    };
+    window._setDoc = async (path, id, data) => {
+      await setDoc(doc(db, path, id), data);
+    };
+    window._addDoc = async (path, data) => {
+      const ref = await addDoc(collection(db, path), data);
+      return ref.id;
+    };
+    window._updateDoc = async (path, id, data) => {
+      await updateDoc(doc(db, path, id), data);
+    };
+    window._getAll = async (path) => {
+      const snap = await getDocs(collection(db, path));
+      const res = [];
+      snap.forEach(d => res.push({ _id: d.id, ...d.data() }));
+      return res;
+    };
+
+    window._firebaseReady = true;
+  </script>
+
+  <style>
+    /* ── RESET ────────────────────────────────────────────────────────────── */
+    *, *::before, *::after {
+      box-sizing: border-box; margin: 0; padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    /* ── THEME TOKENS ─────────────────────────────────────────────────────── */
+    :root {
+      --bg:           #07090f;
+      --surface:      #0d1118;
+      --surface2:     #131c28;
+      --border:       #1e2d3d;
+      --primary:      #0d9488;
+      --primary-h:    #0f766e;
+      --primary-glow: rgba(13,148,136,.15);
+      --text:         #e2e8f0;
+      --dim:          #94a3b8;
+      --muted:        #64748b;
+      --green:        #22c55e;
+      --amber:        #f59e0b;
+      --red:          #ef4444;
+      --r:            12px;
+      --r-sm:         8px;
+    }
+
+    html, body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', system-ui, sans-serif;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    input, select, button, textarea { font-family: inherit; font-size: 15px; }
+
+    /* ── LAYOUT ───────────────────────────────────────────────────────────── */
+    .screen {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px 20px 56px;
+    }
+
+    .card {
+      width: 100%;
+      max-width: 400px;
+    }
+
+    /* ── LOGO ─────────────────────────────────────────────────────────────── */
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      margin-bottom: 32px;
+    }
+
+    .logo-mark {
+      width: 42px; height: 42px;
+      background: var(--primary);
+      border-radius: 11px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px;
+      flex-shrink: 0;
+    }
+
+    .logo-wordmark {
+      font-size: 26px;
+      font-weight: 800;
+      letter-spacing: -0.8px;
+      color: var(--text);
+    }
+
+    .logo-wordmark em {
+      font-style: normal;
+      color: var(--primary);
+    }
+
+    /* ── TYPOGRAPHY ───────────────────────────────────────────────────────── */
+    .title  { font-size: 22px; font-weight: 700; color: var(--text);  margin-bottom: 6px; }
+    .sub    { font-size: 14px; color: var(--muted); margin-bottom: 28px; line-height: 1.55; }
+
+    /* ── FORM ─────────────────────────────────────────────────────────────── */
+    .field { margin-bottom: 14px; }
+
+    .field label {
+      display: block;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--dim);
+      text-transform: uppercase;
+      letter-spacing: .07em;
+      margin-bottom: 6px;
+    }
+
+    .field input {
+      width: 100%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--r-sm);
+      color: var(--text);
+      padding: 12px 14px;
+      transition: border-color .15s, box-shadow .15s;
+    }
+
+    .field input:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px var(--primary-glow);
+    }
+
+    .field input::placeholder { color: var(--muted); }
+
+    /* ── BUTTONS ──────────────────────────────────────────────────────────── */
+    .btn {
+      width: 100%; padding: 14px;
+      border: none; border-radius: var(--r);
+      font-size: 15px; font-weight: 700;
+      cursor: pointer; display: block;
+      text-align: center;
+      transition: opacity .15s, transform .1s, background .15s;
+    }
+
+    .btn:active  { transform: scale(.98); }
+    .btn:disabled { opacity: .45; cursor: not-allowed; }
+    .btn + .btn  { margin-top: 10px; }
+
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-primary:hover:not(:disabled) { background: var(--primary-h); }
+
+    .btn-ghost {
+      background: var(--surface2);
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+    .btn-ghost:hover:not(:disabled) { background: var(--border); }
+
+    /* ── LINKS ────────────────────────────────────────────────────────────── */
+    .link-row {
+      text-align: center;
+      margin-top: 18px;
+      font-size: 14px;
+      color: var(--muted);
+    }
+
+    .link-row a {
+      color: var(--primary);
+      text-decoration: none;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .link-row a:hover { text-decoration: underline; }
+
+    /* ── CHOICE CARDS (org setup) ─────────────────────────────────────────── */
+    .choice-card {
+      background: var(--surface);
+      border: 2px solid var(--border);
+      border-radius: var(--r);
+      padding: 20px;
+      cursor: pointer;
+      margin-bottom: 12px;
+      transition: border-color .15s, background .15s;
+    }
+
+    .choice-card:hover { border-color: var(--primary); background: var(--primary-glow); }
+
+    .choice-icon  { font-size: 26px; margin-bottom: 8px; }
+    .choice-title { font-size: 16px; font-weight: 700; color: var(--text); margin-bottom: 4px; }
+    .choice-sub   { font-size: 13px; color: var(--muted); line-height: 1.4; }
+
+    /* ── INVITE BANNER ────────────────────────────────────────────────────── */
+    .invite-banner {
+      background: var(--primary-glow);
+      border: 1px solid var(--primary);
+      border-radius: var(--r-sm);
+      padding: 12px 14px;
+      margin-bottom: 20px;
+      font-size: 13px;
+      color: var(--primary);
+      font-weight: 600;
+      line-height: 1.4;
+    }
+
+    /* ── SPINNER ──────────────────────────────────────────────────────────── */
+    .spinner {
+      width: 40px; height: 40px;
+      border: 3px solid var(--border);
+      border-top-color: var(--primary);
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+      margin: 0 auto 16px;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── SUCCESS / PLACEHOLDER ────────────────────────────────────────────── */
+    .big-check { font-size: 52px; margin-bottom: 16px; }
+
+    .pill {
+      display: inline-block;
+      background: var(--primary-glow);
+      color: var(--primary);
+      border: 1px solid var(--primary);
+      border-radius: 20px;
+      padding: 4px 14px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      margin-bottom: 16px;
+    }
+
+    .info-row {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--r-sm);
+      padding: 10px 14px;
+      margin: 8px 0;
+      font-size: 13px;
+      color: var(--dim);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .info-row strong { color: var(--text); }
+
+    /* ── TOAST ────────────────────────────────────────────────────────────── */
+    .toast {
+      position: fixed;
+      bottom: 32px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 13px 24px;
+      border-radius: 12px;
+      font-weight: 600;
+      font-size: 14px;
+      z-index: 9999;
+      max-width: 88vw;
+      text-align: center;
+      box-shadow: 0 4px 24px rgba(0,0,0,.5);
+      white-space: nowrap;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+// ── WAIT FOR FIREBASE MODULE ───────────────────────────────────────────────────
+async function waitForFirebase() {
+  let t = 0;
+  while (!window._firebaseReady && t < 100) {
+    await new Promise(r => setTimeout(r, 100));
+    t++;
+  }
+  if (!window._firebaseReady) throw new Error("Firebase failed to load.");
+}
+
+// ── STATE ──────────────────────────────────────────────────────────────────────
+const S = {
+  screen:     'loading',  // loading | login | signup | forgot | org-setup | create-org | join-org | app
+  user:       null,       // Firebase Auth user
+  profile:    null,       // /users/{uid} doc
+  tenant:     null,       // /tenants/{tenantId} doc
+  inviteCode: null,       // from ?invite= URL param
+  inviteData: null,       // fetched invite document
+  toast:      null,
+  toastTimer: null,
+};
+
+function setState(patch) { Object.assign(S, patch); render(); }
+
+function showToast(msg, type = 'ok') {
+  if (S.toastTimer) clearTimeout(S.toastTimer);
+  const t = setTimeout(() => setState({ toast: null, toastTimer: null }), 3500);
+  setState({ toast: { msg, type }, toastTimer: t });
+}
+
+// ── ROUTER ─────────────────────────────────────────────────────────────────────
+const screens = {
+  loading:      renderLoading,
+  login:        renderLogin,
+  signup:       renderSignup,
+  forgot:       renderForgot,
+  'org-setup':  renderOrgSetup,
+  'create-org': renderCreateOrg,
+  'join-org':   renderJoinOrg,
+  app:          renderAppPlaceholder,
+};
+
+function render() {
+  const app = document.getElementById('app');
+  const fn  = screens[S.screen];
+  if (fn) { app.innerHTML = ''; app.appendChild(fn()); }
+
+  // Toast
+  const old = document.getElementById('__toast');
+  if (old) old.remove();
+  if (S.toast) {
+    const bg = S.toast.type === 'err' ? '#7f1d1d'
+             : S.toast.type === 'warn' ? '#78350f'
+             : '#134e4a';
+    const t = document.createElement('div');
+    t.id = '__toast';
+    t.className = 'toast';
+    t.style.background = bg;
+    t.textContent = S.toast.msg;
+    document.body.appendChild(t);
+  }
+}
+
+// ── LOGO COMPONENT ─────────────────────────────────────────────────────────────
+function makeLogo() {
+  const d = document.createElement('div');
+  d.className = 'logo';
+  d.innerHTML = `
+    <div class="logo-mark">⬡</div>
+    <div class="logo-wordmark">Trax<em>ify</em></div>
+  `;
+  return d;
+}
+
+// Helper: build a screen wrapper + card
+function makeScreen() {
+  const s = document.createElement('div');
+  s.className = 'screen';
+  const c = document.createElement('div');
+  c.className = 'card';
+  s.appendChild(c);
+  return { screen: s, card: c };
+}
+
+// Helper: append a chunk of HTML to a node
+function appendHTML(parent, html) {
+  const div = document.createElement('div');
+  div.innerHTML = html;
+  while (div.firstChild) parent.appendChild(div.firstChild);
+}
+
+// ── SCREEN: LOADING ────────────────────────────────────────────────────────────
+function renderLoading() {
+  const { screen, card } = makeScreen();
+  card.style.textAlign = 'center';
+  card.appendChild(makeLogo());
+  appendHTML(card, `
+    <div class="spinner"></div>
+    <div style="color:var(--muted);font-size:14px">Loading…</div>
+  `);
+  return screen;
+}
+
+// ── SCREEN: LOGIN ──────────────────────────────────────────────────────────────
+function renderLogin() {
+  const { screen, card } = makeScreen();
+  card.appendChild(makeLogo());
+
+  if (S.inviteData) {
+    const b = document.createElement('div');
+    b.className = 'invite-banner';
+    b.textContent = `✉️ You've been invited to join ${S.inviteData.tenantName || 'an organization'}. Sign in or create an account below.`;
+    card.appendChild(b);
+  }
+
+  appendHTML(card, `
+    <div class="title">Welcome back</div>
+    <div class="sub">Sign in to your Traxify account</div>
+    <div class="field"><label>Email</label>
+      <input id="li-email" type="email" placeholder="you@company.com" autocomplete="email" />
+    </div>
+    <div class="field"><label>Password</label>
+      <input id="li-pw" type="password" placeholder="••••••••" autocomplete="current-password" />
+    </div>
+  `);
+
+  const signInBtn = document.createElement('button');
+  signInBtn.className = 'btn btn-primary';
+  signInBtn.textContent = 'Sign In';
+  card.appendChild(signInBtn);
+
+  appendHTML(card, `
+    <div class="link-row" style="margin-top:14px"><a id="li-forgot">Forgot password?</a></div>
+    <div class="link-row">Don't have an account? <a id="li-signup">Create one</a></div>
+  `);
+
+  async function doLogin() {
+    const email = document.getElementById('li-email')?.value.trim();
+    const pw    = document.getElementById('li-pw')?.value;
+    if (!email || !pw) { showToast('Please fill in all fields', 'warn'); return; }
+    signInBtn.disabled = true; signInBtn.textContent = 'Signing in…';
+    try {
+      await window._signIn(email, pw);
+      // onAuthStateChanged takes it from here
+    } catch(e) {
+      showToast(friendlyError(e.code), 'err');
+      signInBtn.disabled = false; signInBtn.textContent = 'Sign In';
+    }
+  }
+
+  signInBtn.addEventListener('click', doLogin);
+  setTimeout(() => {
+    document.getElementById('li-pw')?.addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+    document.getElementById('li-forgot')?.addEventListener('click', () => setState({ screen: 'forgot' }));
+    document.getElementById('li-signup')?.addEventListener('click', () => setState({ screen: 'signup' }));
+  }, 0);
+
+  return screen;
+}
+
+// ── SCREEN: SIGN UP ────────────────────────────────────────────────────────────
+function renderSignup() {
+  const { screen, card } = makeScreen();
+  card.appendChild(makeLogo());
+
+  if (S.inviteData) {
+    const b = document.createElement('div');
+    b.className = 'invite-banner';
+    b.textContent = `✉️ You've been invited to join ${S.inviteData.tenantName || 'an organization'}.`;
+    card.appendChild(b);
+  }
+
+  appendHTML(card, `
+    <div class="title">Create your account</div>
+    <div class="sub">${S.inviteData ? 'Create an account to accept your invitation.' : 'Start tracking inventory with your team.'}</div>
+    <div class="field"><label>Your Name</label>
+      <input id="su-name" type="text" placeholder="Jane Smith" autocomplete="name" />
+    </div>
+    <div class="field"><label>Email</label>
+      <input id="su-email" type="email" placeholder="you@company.com" autocomplete="email" />
+    </div>
+    <div class="field"><label>Password</label>
+      <input id="su-pw" type="password" placeholder="Min 6 characters" autocomplete="new-password" />
+    </div>
+    <div class="field"><label>Confirm Password</label>
+      <input id="su-pw2" type="password" placeholder="Repeat password" autocomplete="new-password" />
+    </div>
+  `);
+
+  const createBtn = document.createElement('button');
+  createBtn.className = 'btn btn-primary';
+  createBtn.textContent = 'Create Account';
+  card.appendChild(createBtn);
+
+  appendHTML(card, `<div class="link-row">Already have an account? <a id="su-login">Sign in</a></div>`);
+
+  async function doSignup() {
+    const name  = document.getElementById('su-name')?.value.trim();
+    const email = document.getElementById('su-email')?.value.trim();
+    const pw    = document.getElementById('su-pw')?.value;
+    const pw2   = document.getElementById('su-pw2')?.value;
+
+    if (!name || !email || !pw || !pw2) { showToast('Please fill in all fields', 'warn'); return; }
+    if (pw !== pw2)  { showToast('Passwords do not match', 'err'); return; }
+    if (pw.length < 6) { showToast('Password must be at least 6 characters', 'warn'); return; }
+
+    createBtn.disabled = true; createBtn.textContent = 'Creating account…';
+    try {
+      const cred = await window._signUp(email, pw);
+      const uid  = cred.user.uid;
+      const now  = new Date().toISOString();
+
+      // Write user profile — no tenant yet
+      await window._setDoc('users', uid, {
+        displayName: name,
+        email:       email,
+        tenantId:    null,
+        role:        null,
+        ownerId:     null,
+        createdAt:   now,
+      });
+      // onAuthStateChanged fires → sees no tenantId → shows org-setup
+    } catch(e) {
+      showToast(friendlyError(e.code), 'err');
+      createBtn.disabled = false; createBtn.textContent = 'Create Account';
+    }
+  }
+
+  createBtn.addEventListener('click', doSignup);
+  setTimeout(() => {
+    document.getElementById('su-login')?.addEventListener('click', () => setState({ screen: 'login' }));
+    document.getElementById('su-pw2')?.addEventListener('keydown', e => { if (e.key === 'Enter') doSignup(); });
+  }, 0);
+
+  return screen;
+}
+
+// ── SCREEN: FORGOT PASSWORD ────────────────────────────────────────────────────
+function renderForgot() {
+  const { screen, card } = makeScreen();
+  card.appendChild(makeLogo());
+
+  appendHTML(card, `
+    <div class="title">Reset your password</div>
+    <div class="sub">Enter your email and we'll send you a reset link.</div>
+    <div class="field"><label>Email</label>
+      <input id="fp-email" type="email" placeholder="you@company.com" autocomplete="email" />
+    </div>
+  `);
+
+  const sendBtn = document.createElement('button');
+  sendBtn.className = 'btn btn-primary';
+  sendBtn.textContent = 'Send Reset Link';
+  card.appendChild(sendBtn);
+
+  appendHTML(card, `<div class="link-row"><a id="fp-back">← Back to sign in</a></div>`);
+
+  async function doReset() {
+    const email = document.getElementById('fp-email')?.value.trim();
+    if (!email) { showToast('Please enter your email', 'warn'); return; }
+    sendBtn.disabled = true; sendBtn.textContent = 'Sending…';
+    try {
+      await window._resetPw(email);
+      showToast('✅ Reset link sent — check your email');
+      setState({ screen: 'login' });
+    } catch(e) {
+      showToast(friendlyError(e.code), 'err');
+      sendBtn.disabled = false; sendBtn.textContent = 'Send Reset Link';
+    }
+  }
+
+  sendBtn.addEventListener('click', doReset);
+  setTimeout(() => {
+    document.getElementById('fp-email')?.addEventListener('keydown', e => { if (e.key === 'Enter') doReset(); });
+    document.getElementById('fp-back')?.addEventListener('click', () => setState({ screen: 'login' }));
+  }, 0);
+
+  return screen;
+}
+
+// ── SCREEN: ORG SETUP (choose path) ───────────────────────────────────────────
+function renderOrgSetup() {
+  const { screen, card } = makeScreen();
+  card.appendChild(makeLogo());
+
+  appendHTML(card, `
+    <div class="title">Set up your workspace</div>
+    <div class="sub">Create a new organization for your team, or join one you were invited to.</div>
+  `);
+
+  function makeChoiceCard(icon, title, sub, onClick) {
+    const c = document.createElement('div');
+    c.className = 'choice-card';
+    c.innerHTML = `
+      <div class="choice-icon">${icon}</div>
+      <div class="choice-title">${title}</div>
+      <div class="choice-sub">${sub}</div>
+    `;
+    c.addEventListener('click', onClick);
+    return c;
+  }
+
+  card.appendChild(makeChoiceCard(
+    '🏢', 'Create a new organization',
+    "You'll be the admin. Invite your team after setup.",
+    () => setState({ screen: 'create-org' })
+  ));
+
+  card.appendChild(makeChoiceCard(
+    '🔗', 'Join with an invite link',
+    'Paste the invite link your admin sent you.',
+    () => setState({ screen: 'join-org' })
+  ));
+
+  const signoutRow = document.createElement('div');
+  signoutRow.className = 'link-row';
+  signoutRow.innerHTML = `<a id="os-out">Sign out</a>`;
+  card.appendChild(signoutRow);
+
+  setTimeout(() => {
+    document.getElementById('os-out')?.addEventListener('click', () => {
+      window._signOut();
+      setState({ screen: 'login', user: null, profile: null, tenant: null });
+    });
+  }, 0);
+
+  return screen;
+}
+
+// ── SCREEN: CREATE ORG ─────────────────────────────────────────────────────────
+function renderCreateOrg() {
+  const { screen, card } = makeScreen();
+  card.appendChild(makeLogo());
+
+  appendHTML(card, `
+    <div class="title">Name your organization</div>
+    <div class="sub">This is what your team will see. You can change it later in settings.</div>
+    <div class="field"><label>Organization Name</label>
+      <input id="co-name" type="text" placeholder="e.g. Acme Supplies, City Hospital, Warehouse 3" />
+    </div>
+  `);
+
+  const createBtn = document.createElement('button');
+  createBtn.className = 'btn btn-primary';
+  createBtn.textContent = 'Create Organization';
+  card.appendChild(createBtn);
+
+  appendHTML(card, `<div class="link-row"><a id="co-back">← Back</a></div>`);
+
+  async function doCreate() {
+    const name = document.getElementById('co-name')?.value.trim();
+    if (!name) { showToast('Please enter an organization name', 'warn'); return; }
+    createBtn.disabled = true; createBtn.textContent = 'Creating…';
+
+    try {
+      const uid = S.user.uid;
+      const now = new Date().toISOString();
+
+      // 1. Create tenant document (Firebase auto-generates the ID)
+      const tenantId = await window._addDoc('tenants', {
+        name:      name,
+        createdBy: uid,
+        createdAt: now,
+        plan:      'free',
+      });
+
+      // 2. Create default "Pool" inventory location
+      await window._setDoc(`tenants/${tenantId}/owners`, 'POOL', {
+        name: 'Pool',
+        type: 'pool',
+      });
+
+      // 3. Update user profile with tenant + admin role
+      const profile = {
+        displayName: S.profile.displayName,
+        email:       S.profile.email,
+        tenantId:    tenantId,
+        role:        'admin',
+        ownerId:     'POOL',
+        createdAt:   S.profile.createdAt,
+      };
+      await window._setDoc('users', uid, profile);
+
+      // 4. Mirror user into tenant's users subcollection (for admin panel later)
+      await window._setDoc(`tenants/${tenantId}/users`, uid, {
+        displayName: S.profile.displayName,
+        email:       S.profile.email,
+        role:        'admin',
+        ownerId:     'POOL',
+        addedAt:     now,
+      });
+
+      const tenant = { _id: tenantId, name, createdBy: uid, createdAt: now, plan: 'free' };
+      setState({ profile, tenant, screen: 'app' });
+      showToast('✅ Organization created!');
+    } catch(e) {
+      console.error(e);
+      showToast('Something went wrong: ' + e.message, 'err');
+      createBtn.disabled = false; createBtn.textContent = 'Create Organization';
+    }
+  }
+
+  createBtn.addEventListener('click', doCreate);
+  setTimeout(() => {
+    document.getElementById('co-name')?.addEventListener('keydown', e => { if (e.key === 'Enter') doCreate(); });
+    document.getElementById('co-back')?.addEventListener('click', () => setState({ screen: 'org-setup' }));
+  }, 0);
+
+  return screen;
+}
+
+// ── SCREEN: JOIN ORG ───────────────────────────────────────────────────────────
+function renderJoinOrg() {
+  const { screen, card } = makeScreen();
+  card.appendChild(makeLogo());
+
+  appendHTML(card, `
+    <div class="title">Join an organization</div>
+    <div class="sub">Paste the full invite link your admin sent you.</div>
+    <div class="field"><label>Invite Link</label>
+      <input id="jo-link" type="text" placeholder="Paste invite link here…" autocomplete="off" />
+    </div>
+  `);
+
+  // Pre-fill if we arrived via an invite URL
+  if (S.inviteCode) {
+    setTimeout(() => {
+      const input = document.getElementById('jo-link');
+      if (input) input.value = window.location.href;
+    }, 30);
+  }
+
+  const joinBtn = document.createElement('button');
+  joinBtn.className = 'btn btn-primary';
+  joinBtn.textContent = 'Join Organization';
+  card.appendChild(joinBtn);
+
+  appendHTML(card, `<div class="link-row"><a id="jo-back">← Back</a></div>`);
+
+  async function doJoin() {
+    const raw = document.getElementById('jo-link')?.value.trim();
+    if (!raw) { showToast('Please paste your invite link', 'warn'); return; }
+
+    // Extract invite code from URL or treat input as raw code
+    let code = raw;
+    try {
+      const url = new URL(raw);
+      code = url.searchParams.get('invite') || raw;
+    } catch { /* not a URL — use as-is */ }
+
+    joinBtn.disabled = true; joinBtn.textContent = 'Joining…';
+
+    try {
+      const invite = await window._getDoc('invites', code);
+
+      if (!invite)           { showToast('Invite not found — check the link and try again', 'err'); joinBtn.disabled = false; joinBtn.textContent = 'Join Organization'; return; }
+      if (invite.usedBy)     { showToast('This invite has already been used', 'err');               joinBtn.disabled = false; joinBtn.textContent = 'Join Organization'; return; }
+      if (invite.expiresAt && new Date(invite.expiresAt) < new Date()) {
+        showToast('This invite has expired — ask your admin for a new one', 'err');
+        joinBtn.disabled = false; joinBtn.textContent = 'Join Organization'; return;
+      }
+
+      const uid = S.user.uid;
+      const now = new Date().toISOString();
+      const { tenantId, role, ownerId } = invite;
+
+      const profile = {
+        displayName: S.profile.displayName,
+        email:       S.profile.email,
+        tenantId:    tenantId,
+        role:        role    || 'member',
+        ownerId:     ownerId || 'POOL',
+        createdAt:   S.profile.createdAt,
+      };
+
+      // Save user profile
+      await window._setDoc('users', uid, profile);
+
+      // Mirror into tenant users
+      await window._setDoc(`tenants/${tenantId}/users`, uid, {
+        displayName: S.profile.displayName,
+        email:       S.profile.email,
+        role:        role    || 'member',
+        ownerId:     ownerId || 'POOL',
+        addedAt:     now,
+      });
+
+      // Mark invite as used
+      await window._updateDoc('invites', code, { usedBy: uid, usedAt: now });
+
+      // Load tenant info
+      const tenant = await window._getDoc('tenants', tenantId);
+      setState({ profile, tenant, screen: 'app' });
+      showToast('✅ Welcome to the team!');
+    } catch(e) {
+      console.error(e);
+      showToast('Something went wrong: ' + e.message, 'err');
+      joinBtn.disabled = false; joinBtn.textContent = 'Join Organization';
+    }
+  }
+
+  joinBtn.addEventListener('click', doJoin);
+  setTimeout(() => {
+    document.getElementById('jo-back')?.addEventListener('click', () => setState({ screen: 'org-setup' }));
+    document.getElementById('jo-link')?.addEventListener('keydown', e => { if (e.key === 'Enter') doJoin(); });
+  }, 0);
+
+  return screen;
+}
+
+// ── SCREEN: APP PLACEHOLDER ────────────────────────────────────────────────────
+// Replaced in Step 4 with the full inventory app
+function renderAppPlaceholder() {
+  const { screen, card } = makeScreen();
+  card.appendChild(makeLogo());
+
+  const ph = document.createElement('div');
+  ph.style.textAlign = 'center';
+
+  const name = S.profile?.displayName || 'there';
+  const org  = S.tenant?.name || S.profile?.tenantId || '—';
+  const role = S.profile?.role || '—';
+
+  const checkDiv = document.createElement('div');
+  checkDiv.className = 'big-check';
+  checkDiv.textContent = '✅';
+  ph.appendChild(checkDiv);
+
+  const pillDiv = document.createElement('div');
+  pillDiv.className = 'pill';
+  pillDiv.textContent = 'Step 2 Complete';
+  ph.appendChild(pillDiv);
+
+  const titleDiv = document.createElement('div');
+  titleDiv.className = 'title';
+  titleDiv.style.marginBottom = '6px';
+  titleDiv.textContent = `You're in, ${name}!`;
+  ph.appendChild(titleDiv);
+
+  const subDiv = document.createElement('div');
+  subDiv.className = 'sub';
+  subDiv.style.marginBottom = '20px';
+  subDiv.textContent = 'Auth and organization setup is working. The main app arrives in Step 4.';
+  ph.appendChild(subDiv);
+
+  // Show org info
+  const rows = [
+    ['Organization', org],
+    ['Your Role',    role],
+    ['Email',        S.profile?.email || '—'],
+  ];
+  rows.forEach(([label, val]) => {
+    const row = document.createElement('div');
+    row.className = 'info-row';
+    row.innerHTML = `<span>${label}</span><strong>${val}</strong>`;
+    ph.appendChild(row);
+  });
+
+  const signoutBtn = document.createElement('button');
+  signoutBtn.className = 'btn btn-ghost';
+  signoutBtn.textContent = 'Sign Out';
+  signoutBtn.style.marginTop = '24px';
+  signoutBtn.addEventListener('click', () => {
+    window._signOut();
+    setState({ screen: 'login', user: null, profile: null, tenant: null });
+  });
+  ph.appendChild(signoutBtn);
+
+  card.appendChild(ph);
+  return screen;
+}
+
+// ── AUTH ERROR → FRIENDLY MESSAGE ─────────────────────────────────────────────
+function friendlyError(code) {
+  const map = {
+    'auth/invalid-email':          'Please enter a valid email address.',
+    'auth/user-not-found':         'No account found with that email.',
+    'auth/wrong-password':         'Incorrect password.',
+    'auth/invalid-credential':     'Incorrect email or password.',
+    'auth/email-already-in-use':   'An account with that email already exists.',
+    'auth/weak-password':          'Password must be at least 6 characters.',
+    'auth/too-many-requests':      'Too many attempts. Please wait and try again.',
+    'auth/network-request-failed': 'Network error. Check your connection.',
+  };
+  return map[code] || 'Something went wrong. Please try again.';
+}
+
+// ── INIT ───────────────────────────────────────────────────────────────────────
+async function init() {
+  render(); // show loading spinner right away
+
+  // Check URL for ?invite= param
+  const params     = new URLSearchParams(window.location.search);
+  const inviteCode = params.get('invite');
+  if (inviteCode) S.inviteCode = inviteCode;
+
+  await waitForFirebase();
+
+  // Try to pre-fetch invite data to show org name on login/signup
+  if (inviteCode) {
+    try {
+      const inv = await window._getDoc('invites', inviteCode);
+      if (inv && !inv.usedBy) S.inviteData = inv;
+    } catch(e) { /* ignore */ }
+  }
+
+  // Listen for auth state
+  window._onAuth(async (user) => {
+    if (!user) {
+      setState({ screen: 'login', user: null, profile: null, tenant: null });
+      return;
+    }
+
+    setState({ user, screen: 'loading' });
+
+    // Load user profile from Firestore
+    let profile = null;
+    try { profile = await window._getDoc('users', user.uid); } catch(e) { console.error(e); }
+
+    if (!profile) {
+      // Signed in but no Firestore profile — send to signup to complete
+      setState({ screen: 'signup' });
+      return;
+    }
+
+    setState({ profile });
+
+    // No tenant yet → go to org setup (or skip to join if invite in URL)
+    if (!profile.tenantId) {
+      setState({ screen: S.inviteCode ? 'join-org' : 'org-setup' });
+      return;
+    }
+
+    // Load tenant info and go to app
+    let tenant = null;
+    try { tenant = await window._getDoc('tenants', profile.tenantId); } catch(e) { console.error(e); }
+    setState({ tenant, screen: 'app' });
+  });
+}
+
+init();
+</script>
+</body>
+</html>
