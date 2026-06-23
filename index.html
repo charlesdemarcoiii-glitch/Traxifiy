@@ -16,7 +16,7 @@
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
     import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-    import { getFirestore, collection, doc, getDocs, getDoc, setDoc, addDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+    import { getFirestore, collection, doc, getDocs, getDoc, setDoc, addDoc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
     const firebaseConfig = {
       apiKey:            "AIzaSyBIB1f69foJb4Svw15T4yv8KV4uzjC66_M",
@@ -53,6 +53,7 @@
     window.fsSetSettings = async (data) => { await setDoc(doc(db,tc("settings"),"checkin"),data); };
     window.fsSetTenantUser  = async (tid,uid,d) => { await setDoc(doc(db,"tenants/"+tid+"/users",uid),d); };
     window.fsSetTenantOwner = async (tid,oid,d) => { await setDoc(doc(db,"tenants/"+tid+"/owners",oid),d); };
+    window.fsDelete = async (col,id) => { await deleteDoc(doc(db,tc(col),id)); };
     window._firebaseReady = true;
   </script>
   <style>
@@ -100,7 +101,7 @@ const S={
   showAccountMenu:false,tab:"dashboard",loading:false,toast:null,toastTimer:null,
   scanning:false,scanMode:null,scanHint:"",inventorySearch:"",modal:null,selectedOwner:null,
   showScanPrompt:false,owners:[],items:[],orders:[],log:[],users:[],
-  settings:{itemNames:["DFX","DFXM","BTFT","DTF-31","DTF-31Q","DTF-18","DTF-40","DTFD-13","DTFD-24","BVNA","RF UNIT","IntraVu","IntraVu Monitor"],descriptions:["Disposable","Capital Equipment"]},
+  settings:{itemNames:[],descriptions:[]},
   multiMode:false,multiDetails:null,multiCodes:[],
   showMultiDetails:false,showMultiScan:false,showMultiConfirm:false,
   activeOrder:null,showOrderGen:false,
@@ -116,7 +117,7 @@ async function loadData(){
   try{
     const [ownR,itmR,logR,usrR,ordR]=await Promise.allSettled([window.fsGetAll("owners"),window.fsGetAll("items"),window.fsGetAll("log"),window.fsGetAll("users"),window.fsGetAll("orders")]);
     const settR=await window.fsGetSettings();
-    const defaults={itemNames:["DFX","DFXM","BTFT","DTF-31","DTF-31Q","DTF-18","DTF-40","DTFD-13","DTFD-24","BVNA","RF UNIT","IntraVu","IntraVu Monitor"],descriptions:["Disposable","Capital Equipment"]};
+    const defaults={itemNames:[],descriptions:[]};
     const settings=settR?{itemNames:settR.itemNames||defaults.itemNames,descriptions:settR.descriptions||defaults.descriptions}:defaults;
     setState({
       owners:(ownR.status==="fulfilled"?ownR.value:[]).map(o=>({id:o._id,name:o.name,type:o.type})),
@@ -140,7 +141,7 @@ async function submitUndoCheckout(item){
   const ce=itemLog.find(l=>l.action==="CHECK_OUT");
   let ro=null;
   if(ce&&ce.from){const v=ce.from.trim().toLowerCase();ro=S.owners.find(o=>o.name.trim().toLowerCase()===v||o.id.trim().toLowerCase()===v);}
-  if(!ro)ro=S.owners.find(o=>o.id.toUpperCase()==="POOL")||S.owners[0];
+  if(!ro)ro=S.owners[0];
   setState({items:S.items.map(i=>i.barcode===item.barcode?{...i,status:"active",ownerId:ro.id,usedBy:""}:i)});
   showToast("\u21a9\ufe0f "+item.name+" returned to "+ro.name);
   updateItem(item.barcode,{status:"active",ownerId:ro.id,usedBy:""}).then(()=>addLog({ts:now,action:"UNDO_CHECKOUT",barcode:item.barcode,itemName:item.name,from:"USED",to:ro.name,user:getProfile().displayName})).catch(e=>showToast("Failed: "+e.message,"err"));
@@ -157,7 +158,7 @@ async function submitCheckin(barcode,name,type,expDate,ownerId){
 async function submitMultiCheckin(){
   const{multiDetails,multiCodes,owners}=S;
   setState({loading:true,showMultiConfirm:false});
-  const pool=owners.find(o=>o.id.toUpperCase()==="POOL")||owners[0];
+  const pool=owners[0];
   const now=new Date().toISOString();
   try{
     for(const barcode of multiCodes){
@@ -416,10 +417,10 @@ function renderCreateOrg(){
       const uid=S.firebaseUser.uid,now=new Date().toISOString();
       const tenantId=await window.fsAddTenant({name,createdBy:uid,createdAt:now,plan:"free"});
       window._tenantId=tenantId;
-      const profile={displayName:S.profile.displayName,email:S.profile.email,tenantId,role:"admin",ownerId:"POOL",createdAt:S.profile.createdAt};
+      const profile={displayName:S.profile.displayName,email:S.profile.email,tenantId,role:"admin",ownerId:"",createdAt:S.profile.createdAt};
       await window.fsSetUser(uid,profile);
-      await window.fsSetTenantOwner(tenantId,"POOL",{name:"Pool",type:"pool"});
-      await window.fsSetTenantUser(tenantId,uid,{displayName:S.profile.displayName,email:S.profile.email,role:"admin",ownerId:"POOL",addedAt:now});
+      await window.fsSetSettings({itemNames:[],descriptions:[]});
+      await window.fsSetTenantUser(tenantId,uid,{displayName:S.profile.displayName,email:S.profile.email,role:"admin",ownerId:"",addedAt:now});
       setState({profile,tenant:{_id:tenantId,name},screen:"app"});showToast("✅ Organization created!");loadData();
     }catch(e){errDiv.innerHTML='<p style="color:#f87171;font-size:13px;text-align:center">⚠ '+e.message+'</p>';btn.disabled=false;btn.textContent="Create Organization";}
   };
@@ -445,9 +446,9 @@ function renderJoinOrg(){
       if(invite.usedBy){errDiv.innerHTML='<p style="color:#f87171;font-size:13px;text-align:center">⚠ Invite already used</p>';btn.disabled=false;btn.textContent="Join Organization";return;}
       const uid=S.firebaseUser.uid,now=new Date().toISOString(),{tenantId,role,ownerId}=invite;
       window._tenantId=tenantId;
-      const profile={displayName:S.profile.displayName,email:S.profile.email,tenantId,role:role||"member",ownerId:ownerId||"POOL",createdAt:S.profile.createdAt};
+      const profile={displayName:S.profile.displayName,email:S.profile.email,tenantId,role:role||"member",ownerId:ownerId||"",createdAt:S.profile.createdAt};
       await window.fsSetUser(uid,profile);
-      await window.fsSetTenantUser(tenantId,uid,{displayName:S.profile.displayName,email:S.profile.email,role:role||"member",ownerId:ownerId||"POOL",addedAt:now});
+      await window.fsSetTenantUser(tenantId,uid,{displayName:S.profile.displayName,email:S.profile.email,role:role||"member",ownerId:ownerId||"",addedAt:now});
       await window.fsUpdateInvite(code,{usedBy:uid,usedAt:now});
       const tenant=await window.fsGetTenant(tenantId);
       setState({profile,tenant,screen:"app"});showToast("✅ Welcome to the team!");loadData();
@@ -531,7 +532,7 @@ function renderApp(){
     visOwners.forEach(owner=>{
       const oi=activeItems.filter(i=>i.ownerId===owner.id);const oe=oi.filter(i=>i.expDate&&new Date(i.expDate)<new Date());
       const card=el("div",{class:"card",style:{display:"flex",alignItems:"center",justifyContent:"space-between",cursor:"pointer"}});
-      const icon=owner.id.toUpperCase()==="POOL"?"🏪":owner.type==="locker"?"🗄":"👤";
+      const icon="📍";
       card.innerHTML='<div style="display:flex;align-items:center;gap:10px"><span style="font-size:22px">'+icon+'</span><div><div style="font-weight:700;color:#f1f5f9;font-size:14px">'+owner.name+'</div><div style="color:#64748b;font-size:11px">'+(owner.type||"")+'</div></div></div><div style="text-align:right"><div style="font-weight:700;color:#38bdf8;font-size:20px">'+oi.length+'</div>'+(oe.length>0?'<div style="color:#ef4444;font-size:11px">'+oe.length+' exp</div>':"")+'</div>';
       card.onclick=()=>setState({selectedOwner:owner,tab:"inventory"});content.appendChild(card);
     });
@@ -542,7 +543,7 @@ function renderApp(){
       const allBtn=el("button",{style:{padding:"7px 14px",borderRadius:"7px",border:"1px solid #334155",background:!selectedOwner?"#0ea5e9":"#1e293b",color:!selectedOwner?"#fff":"#94a3b8",fontSize:"13px",fontWeight:"600"}},"All");
       allBtn.onclick=()=>setState({selectedOwner:null});filters.appendChild(allBtn);
       owners.filter(o=>o.id!=="USED").forEach(o=>{
-        const icon=o.id.toUpperCase()==="POOL"?"🏪":o.type==="locker"?"🗄":"👤";
+        const icon="📍";
         const btn=el("button",{style:{padding:"7px 14px",borderRadius:"7px",border:"1px solid #334155",background:selectedOwner?.id===o.id?"#0ea5e9":"#1e293b",color:selectedOwner?.id===o.id?"#fff":"#94a3b8",fontSize:"13px",fontWeight:"600"}},icon+" "+o.name);
         btn.onclick=()=>setState({selectedOwner:o});filters.appendChild(btn);
       });
@@ -649,7 +650,7 @@ function renderSettings(){
 
     const ol=el("label",{class:"label"},"Assign to Location");
     const os=el("select",{id:"inv-owner"});
-    S.owners.forEach(o=>{const icon=o.id.toUpperCase()==="POOL"?"🏪":o.type==="locker"?"🗄":"👤";os.appendChild(el("option",{value:o.id},icon+" "+o.name));});
+    S.owners.forEach(o=>{const icon="📍";os.appendChild(el("option",{value:o.id},icon+" "+o.name));});
     invCard.appendChild(ol);invCard.appendChild(os);invCard.appendChild(el("div",{style:{height:"16px"}}));
 
     const resultBox=el("div",{id:"inv-result",style:{display:"none",background:"#0f172a",border:"1px solid #334155",borderRadius:"9px",padding:"14px",marginBottom:"14px"}});
@@ -658,7 +659,7 @@ function renderSettings(){
     const genBtn=el("button",{class:"btn btn-purple"},"Generate Invite Link");
     genBtn.onclick=async()=>{
       const role=document.getElementById("inv-role")?.value||"member";
-      const ownerId=document.getElementById("inv-owner")?.value||"POOL";
+      const ownerId=document.getElementById("inv-owner")?.value||"";
       genBtn.disabled=true;genBtn.textContent="Generating…";
       try{
         const expires=new Date(Date.now()+7*24*60*60*1000).toISOString();
@@ -742,16 +743,70 @@ function renderSettings(){
     renderTagEditor(ciCard,"Descriptions","descriptions","e.g. Rental, Loaner");
     wrap.appendChild(ciCard);
 
-    // ── LOCATIONS (placeholder) ──
-    wrap.appendChild(el("p",{style:{color:"#475569",fontSize:"11px",fontWeight:"600",margin:"16px 0 8px",textTransform:"uppercase",letterSpacing:".07em"}},"Locations"));
+    // ── LOCATIONS ──
+    wrap.appendChild(el("p",{style:{color:"#475569",fontSize:"11px",fontWeight:"600",margin:"16px 0 8px",textTransform:"uppercase",letterSpacing:".07em"}},"Locations ("+S.owners.length+")"));
     const locCard=el("div",{class:"card"});
-    S.owners.forEach((o,i)=>{
-      const icon=o.id.toUpperCase()==="POOL"?"🏪":o.type==="locker"?"🗄":"👤";
-      const row=el("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 0",borderBottom:i<S.owners.length-1?"1px solid #1e293b":"none"}});
-      row.innerHTML='<div style="display:flex;align-items:center;gap:8px"><span style="font-size:18px">'+icon+'</span><span style="color:#f1f5f9;font-size:14px;font-weight:600">'+o.name+'</span></div><span style="color:#475569;font-size:12px">'+(o.type||"")+'</span>';
-      locCard.appendChild(row);
-    });
-    locCard.appendChild(el("p",{style:{color:"#334155",fontSize:"12px",margin:"10px 0 0",textAlign:"center"}},"Add / edit locations — coming soon"));
+
+    function refreshLocations(){
+      locCard.innerHTML="";
+      if(S.owners.length===0){locCard.appendChild(el("p",{style:{color:"#334155",fontSize:"13px",textAlign:"center",padding:"8px 0 12px"}},"No locations yet — add one below"));}
+      S.owners.forEach((o,i)=>{
+        const row=el("div",{style:{display:"flex",alignItems:"center",gap:"8px",padding:"8px 0",borderBottom:i<S.owners.length-1?"1px solid #1e293b":"none"}});
+        const nameSpan=el("span",{style:{flex:"1",color:"#f1f5f9",fontSize:"14px",fontWeight:"600"}},o.name);
+        // Edit button
+        const editBtn=el("button",{style:{padding:"5px 10px",borderRadius:"7px",border:"1px solid #334155",background:"#1e293b",color:"#94a3b8",fontSize:"12px",fontWeight:"600",cursor:"pointer",fontFamily:"inherit"}},"✏️ Edit");
+        editBtn.onclick=()=>{
+          // Replace name span with inline input
+          const inp=el("input",{type:"text",style:{flex:"1",padding:"6px 10px",fontSize:"14px",borderRadius:"7px"}});
+          inp.value=o.name;
+          row.replaceChild(inp,nameSpan);
+          editBtn.textContent="Save";
+          editBtn.style.color="#4ade80";
+          editBtn.onclick=async()=>{
+            const newName=inp.value.trim();
+            if(!newName){showToast("Enter a location name","warn");return;}
+            editBtn.disabled=true;editBtn.textContent="Saving…";
+            try{
+              await window.fsUpdate("owners",o.id,{name:newName});
+              const updated=S.owners.map(loc=>loc.id===o.id?{...loc,name:newName}:loc);
+              setState({owners:updated});showToast("✅ Location updated");
+            }catch(e){showToast("Failed: "+e.message,"err");editBtn.disabled=false;editBtn.textContent="Save";}
+          };
+        };
+        // Delete button
+        const delBtn=el("button",{style:{padding:"5px 10px",borderRadius:"7px",border:"1px solid #7f1d1d",background:"transparent",color:"#f87171",fontSize:"12px",fontWeight:"600",cursor:"pointer",fontFamily:"inherit"}},"🗑 Delete");
+        delBtn.onclick=async()=>{
+          if(!confirm("Delete location \""+o.name+"\"? Items assigned here will still exist but their location will show as the deleted ID."))return;
+          delBtn.disabled=true;delBtn.textContent="Deleting…";
+          try{
+            await window.fsDelete("owners",o.id);
+            const updated=S.owners.filter(loc=>loc.id!==o.id);
+            setState({owners:updated});showToast("🗑 Location deleted");
+          }catch(e){showToast("Failed: "+e.message,"err");delBtn.disabled=false;delBtn.textContent="🗑 Delete";}
+        };
+        row.appendChild(nameSpan);row.appendChild(editBtn);row.appendChild(delBtn);
+        locCard.appendChild(row);
+      });
+
+      // Add new location row
+      const addRow=el("div",{style:{display:"flex",gap:"8px",marginTop:S.owners.length>0?"12px":"4px"}});
+      const addInput=el("input",{type:"text",placeholder:"New location name…",style:{flex:"1",padding:"9px 12px",fontSize:"14px"}});
+      const addBtn=el("button",{style:{padding:"9px 16px",borderRadius:"9px",border:"none",background:"#0ea5e9",color:"#fff",fontWeight:"700",fontSize:"14px",cursor:"pointer",whiteSpace:"nowrap"}},"+ Add");
+      addBtn.onclick=async()=>{
+        const name=addInput.value.trim();
+        if(!name){showToast("Enter a location name","warn");return;}
+        addBtn.disabled=true;addBtn.textContent="Adding…";
+        try{
+          const id=await window.fsAdd("owners",{name,type:"location"});
+          const newOwner={id,name,type:"location"};
+          addInput.value="";
+          setState({owners:[...S.owners,newOwner]});showToast("✅ Location added");
+        }catch(e){showToast("Failed: "+e.message,"err");addBtn.disabled=false;addBtn.textContent="+ Add";}
+      };
+      addInput.onkeydown=e=>{if(e.key==="Enter")addBtn.onclick();};
+      addRow.appendChild(addInput);addRow.appendChild(addBtn);locCard.appendChild(addRow);
+    }
+    refreshLocations();
     wrap.appendChild(locCard);
 
     // ── ITEM TYPES (placeholder) ──
@@ -834,7 +889,7 @@ function renderMultiConfirm(){
   cl.innerHTML='<p style="color:#94a3b8;font-size:11px;font-weight:600;margin:0 0 8px;text-transform:uppercase;letter-spacing:.05em">Scanned Codes</p>';
   multiCodes.forEach((code,i)=>{const row=el("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"4px 0",borderBottom:i<multiCodes.length-1?"1px solid #1e293b":"none"}});row.innerHTML='<span style="color:#94a3b8;font-size:12px;font-family:monospace">'+code+'</span>';const rb=el("button",{style:{background:"none",border:"none",color:"#475569",fontSize:"14px",cursor:"pointer",padding:"2px 6px"}},"✕");rb.onclick=()=>{setState({multiCodes:S.multiCodes.filter(c=>c!==code)});};row.appendChild(rb);cl.appendChild(row);});
   inner.appendChild(cl);
-  const pool=S.owners.find(o=>o.id.toUpperCase()==="POOL")||S.owners[0];
+  const pool=S.owners[0];
   inner.appendChild(el("p",{style:{color:"#475569",fontSize:"12px",margin:"0 0 16px",textAlign:"center"}},"All items → 🏪 "+(pool?.name||"General Pool")));
   const cfb=el("button",{class:"btn btn-green",style:{marginBottom:"10px"}},"✅ Confirm — Check In "+multiCodes.length+" Item"+(multiCodes.length!==1?"s":""));cfb.onclick=submitMultiCheckin;inner.appendChild(cfb);
   const bb=el("button",{class:"btn btn-dark",style:{marginBottom:"10px"}},"← Scan More Codes");bb.onclick=()=>setState({showMultiConfirm:false,showMultiScan:true,scanning:true,scanHint:"Scan QR codes — tap Done when finished"});inner.appendChild(bb);
@@ -890,7 +945,7 @@ function renderTransferPage(modal,owners){
   const fc=document.createElement("div");fc.style.cssText="background:#0f172a;border-radius:12px;border:1px solid #334155;padding:16px;margin-bottom:16px;";fc.innerHTML="<div style='color:#94a3b8;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px'>From</div><div style='color:#38bdf8;font-weight:700;font-size:16px'>"+fromName+"</div>";inner.appendChild(fc);
   const tl=document.createElement("div");tl.style.cssText="color:#94a3b8;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;";tl.textContent="Transfer To";inner.appendChild(tl);
   const validOwners=owners.filter(o=>o.id!==item.ownerId&&o.id!=="USED");let destOwnerId=admin?(validOwners[0]?.id||""):profile.ownerId;
-  if(admin){const sel=document.createElement("select");sel.style.cssText="width:100%;background:#0f172a;border:1px solid #334155;border-radius:9px;color:#f1f5f9;padding:14px;font-size:15px;margin-bottom:24px;font-family:inherit;box-sizing:border-box;";validOwners.forEach(function(o){const icon=o.id.toUpperCase()==="POOL"?"🏪":o.type==="locker"?"🗄":"👤";const opt=document.createElement("option");opt.value=o.id;opt.textContent=icon+" "+o.name;sel.appendChild(opt);});if(sel.options.length>0)sel.value=destOwnerId;sel.onchange=function(){destOwnerId=this.value;};inner.appendChild(sel);}
+  if(admin){const sel=document.createElement("select");sel.style.cssText="width:100%;background:#0f172a;border:1px solid #334155;border-radius:9px;color:#f1f5f9;padding:14px;font-size:15px;margin-bottom:24px;font-family:inherit;box-sizing:border-box;";validOwners.forEach(function(o){const icon="📍";const opt=document.createElement("option");opt.value=o.id;opt.textContent=icon+" "+o.name;sel.appendChild(opt);});if(sel.options.length>0)sel.value=destOwnerId;sel.onchange=function(){destOwnerId=this.value;};inner.appendChild(sel);}
   else{const dc=document.createElement("div");dc.style.cssText="background:#0f172a;border-radius:12px;border:1px solid #0ea5e9;padding:16px;margin-bottom:24px;";dc.innerHTML="<div style='color:#38bdf8;font-weight:700;font-size:16px'>👤 "+(userOwner?.name||profile.displayName)+"</div><div style='color:#475569;font-size:12px;margin-top:4px'>Your inventory</div>";inner.appendChild(dc);}
   const cfb=document.createElement("button");cfb.textContent="✓ Confirm Transfer";cfb.style.cssText="width:100%;padding:18px;border-radius:12px;border:none;background:#6366f1;color:#fff;font-weight:700;font-size:17px;cursor:pointer;display:block;font-family:inherit;margin-bottom:12px;-webkit-appearance:none;";cfb.onclick=function(){const dest=destOwnerId;if(!dest){showToast("Please select a destination","warn");return;}if(dest===item.ownerId){showToast("Item is already in this inventory","warn");return;}submitTransfer(item,dest);};inner.appendChild(cfb);
   const cb2=document.createElement("button");cb2.textContent="Cancel";cb2.style.cssText="width:100%;padding:14px;border-radius:12px;border:1px solid #334155;background:#1e293b;color:#94a3b8;font-weight:600;font-size:15px;cursor:pointer;display:block;font-family:inherit;-webkit-appearance:none;";cb2.onclick=function(){setState({modal:null});};inner.appendChild(cb2);
@@ -902,7 +957,7 @@ function renderModal(){
   const div=document.createElement("div");div.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.85);display:flex;align-items:flex-end;justify-content:center;z-index:500;";div.onclick=function(e){if(e.target===div)setState({modal:null});};
   const inner=document.createElement("div");inner.style.cssText="width:100%;max-width:480px;background:#111827;border-radius:20px 20px 0 0;padding:24px 20px 48px;border:1px solid #1e293b;max-height:85vh;overflow-y:auto;-webkit-overflow-scrolling:touch;";inner.onclick=function(e){e.stopPropagation();};
   if(modal.type==="checkin"){
-    const pool=owners.find(o=>o.id.toUpperCase()==="POOL")||owners[0];
+    const pool=owners[0];
     const hdr=document.createElement("div");hdr.style.cssText="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;";const title=document.createElement("h2");title.style.cssText="color:#f1f5f9;font-size:18px;font-weight:700;margin:0;";title.textContent="Check In Equipment";const xBtn=document.createElement("button");xBtn.style.cssText="background:none;border:none;color:#475569;font-size:24px;cursor:pointer;padding:4px 8px;";xBtn.textContent="✕";xBtn.onclick=function(){setState({modal:null});};hdr.appendChild(title);hdr.appendChild(xBtn);inner.appendChild(hdr);
     const bp=document.createElement("p");bp.style.cssText="color:#64748b;font-size:12px;font-family:monospace;margin:0 0 16px;";bp.textContent="Barcode: "+modal.barcode;inner.appendChild(bp);
     let name="",type="",expDate="";
@@ -910,9 +965,11 @@ function renderModal(){
     const i1=document.createElement("select");i1.style.cssText="width:100%;background:#0f172a;border:1px solid #334155;border-radius:9px;color:#f1f5f9;padding:11px 14px;font-size:15px;font-family:inherit;margin-bottom:14px;box-sizing:border-box;-webkit-appearance:none;";const d1=document.createElement("option");d1.value="";d1.textContent="Select item…";i1.appendChild(d1);(S.settings.itemNames||[]).forEach(function(item){const o=document.createElement("option");o.value=item;o.textContent=item;i1.appendChild(o);});i1.onchange=function(){name=this.value;};inner.appendChild(n1);inner.appendChild(i1);
     const n2=document.createElement("label");n2.style.cssText="color:#94a3b8;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:6px;";n2.textContent="Description";const i2=document.createElement("select");i2.style.cssText="width:100%;background:#0f172a;border:1px solid #334155;border-radius:9px;color:#f1f5f9;padding:11px 14px;font-size:15px;font-family:inherit;margin-bottom:14px;box-sizing:border-box;-webkit-appearance:none;";const d2=document.createElement("option");d2.value="";d2.textContent="Select description… (optional)";i2.appendChild(d2);(S.settings.descriptions||[]).forEach(function(t){const o=document.createElement("option");o.value=t;o.textContent=t;i2.appendChild(o);});i2.onchange=function(){type=this.value;};inner.appendChild(n2);inner.appendChild(i2);
     const n3=document.createElement("label");n3.style.cssText="color:#94a3b8;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:6px;";n3.textContent="Expiration Date (optional)";const i3=document.createElement("input");i3.type="date";i3.style.cssText="width:100%;background:#0f172a;border:1px solid #334155;border-radius:9px;color:#f1f5f9;padding:11px 14px;font-size:15px;font-family:inherit;margin-bottom:14px;box-sizing:border-box;";i3.oninput=function(){expDate=this.value;};inner.appendChild(n3);inner.appendChild(i3);
-    const n4=document.createElement("label");n4.style.cssText="color:#94a3b8;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:6px;";n4.textContent="Assign To";const db=document.createElement("div");db.style.cssText="padding:11px 14px;border-radius:9px;border:1px solid #334155;background:#0f172a;color:#38bdf8;font-size:15px;font-weight:600;margin-bottom:6px;";db.textContent="🏪 "+(pool?.name||"General Pool");const dn=document.createElement("p");dn.style.cssText="color:#475569;font-size:11px;margin:0 0 20px;";dn.textContent="All items go to General Pool first.";inner.appendChild(n4);inner.appendChild(db);inner.appendChild(dn);
+    const n4=document.createElement("label");n4.style.cssText="color:#94a3b8;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:6px;";n4.textContent="Check In To";inner.appendChild(n4);
+    if(owners.length===0){const noLoc=document.createElement("div");noLoc.style.cssText="padding:11px 14px;border-radius:9px;border:1px solid #334155;background:#0f172a;color:#f87171;font-size:13px;margin-bottom:20px;";noLoc.textContent="⚠ No locations set up yet — add locations in Settings first.";inner.appendChild(noLoc);}
+    else{let checkinOwnerId=owners[0].id;const sel=document.createElement("select");sel.style.cssText="width:100%;background:#0f172a;border:1px solid #334155;border-radius:9px;color:#f1f5f9;padding:11px 14px;font-size:15px;font-family:inherit;margin-bottom:20px;box-sizing:border-box;-webkit-appearance:none;";owners.forEach(function(o){const opt=document.createElement("option");opt.value=o.id;opt.textContent=o.name;sel.appendChild(opt);});sel.onchange=function(){checkinOwnerId=this.value;};inner.appendChild(sel);
     const sb=document.createElement("button");sb.textContent="Confirm Check In";sb.style.cssText="width:100%;padding:16px;border-radius:10px;border:none;background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff;font-weight:700;font-size:16px;cursor:pointer;display:block;font-family:inherit;-webkit-appearance:none;";
-    sb.onclick=function(){if(!name){showToast("Enter item name","warn");return;}if(!pool){showToast("No pool found","err");return;}setState({modal:null,loading:false});showToast("✅ "+name+" → "+(pool?.name||"Pool"));submitCheckin(modal.barcode,name,type,expDate,pool.id).catch(e=>console.error(e));};inner.appendChild(sb);
+    sb.onclick=function(){if(!name){showToast("Enter item name","warn");return;}setState({modal:null,loading:false});showToast("✅ "+name+" → "+(owners.find(o=>o.id===checkinOwnerId)?.name||checkinOwnerId));submitCheckin(modal.barcode,name,type,expDate,checkinOwnerId).catch(e=>console.error(e));};inner.appendChild(sb);}
   }
   if(modal.type==="checkout"){
     const hdr=document.createElement("div");hdr.style.cssText="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;";const title=document.createElement("h2");title.style.cssText="color:#f1f5f9;font-size:18px;font-weight:700;margin:0;";title.textContent="Check Out Item";const xBtn=document.createElement("button");xBtn.style.cssText="background:none;border:none;color:#475569;font-size:24px;cursor:pointer;padding:4px 8px;";xBtn.textContent="✕";xBtn.onclick=function(){setState({modal:null});};hdr.appendChild(title);hdr.appendChild(xBtn);inner.appendChild(hdr);
