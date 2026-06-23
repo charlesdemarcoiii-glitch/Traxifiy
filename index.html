@@ -1,4 +1,4 @@
-<!DOCTYPE html><!-- Traxify v1.0 — Step 2: Auth + Onboarding -->
+<!DOCTYPE html><!-- Traxify v1.0 — Step 4: Full App -->
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -7,22 +7,15 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="Traxify" />
-  <meta name="description" content="Inventory tracking for teams" />
   <title>Traxify</title>
-
-  <!-- ── FIREBASE (ES Module) ─────────────────────────────────────────────── -->
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-    import {
-      getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword,
-      sendPasswordResetEmail, signOut, onAuthStateChanged
-    } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-    import {
-      getFirestore, doc, getDoc, setDoc, collection,
-      addDoc, updateDoc, getDocs
-    } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+    import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+    import { getFirestore, collection, doc, getDocs, getDoc, setDoc, addDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
-    // ── PASTE YOUR NEW FIREBASE CONFIG HERE ──────────────────────────────────
+    // ── PASTE YOUR FIREBASE CONFIG HERE ──────────────────────────────────────
     const firebaseConfig = {
       apiKey:            "AIzaSyBIB1f69foJb4Svw15T4yv8KV4uzjC66_M",
       authDomain:        "traxify-45545.firebaseapp.com",
@@ -34,933 +27,1494 @@
     // ─────────────────────────────────────────────────────────────────────────
 
     const firebaseApp = initializeApp(firebaseConfig);
-    const auth        = getAuth(firebaseApp);
-    const db          = getFirestore(firebaseApp);
+    const auth = getAuth(firebaseApp);
+    const db   = getFirestore(firebaseApp);
 
-    // Auth helpers
-    window._signIn   = (e, p) => signInWithEmailAndPassword(auth, e, p);
-    window._signUp   = (e, p) => createUserWithEmailAndPassword(auth, e, p);
-    window._resetPw  = (e)    => sendPasswordResetEmail(auth, e);
-    window._signOut  = ()     => signOut(auth);
-    window._onAuth   = (cb)   => onAuthStateChanged(auth, cb);
+    window._signIn  = (e,p) => signInWithEmailAndPassword(auth,e,p);
+    window._signUp  = (e,p) => createUserWithEmailAndPassword(auth,e,p);
+    window._resetPw = (e)   => sendPasswordResetEmail(auth,e);
+    window._signOut = ()    => signOut(auth);
+    window._onAuth  = (cb)  => onAuthStateChanged(auth,cb);
 
-    // Firestore helpers
-    window._getDoc = async (path, id) => {
-      const snap = await getDoc(doc(db, path, id));
-      return snap.exists() ? { _id: snap.id, ...snap.data() } : null;
+    window._getDoc = async (path,id) => {
+      const snap = await getDoc(doc(db,path,id));
+      return snap.exists() ? {_id:snap.id,...snap.data()} : null;
     };
-    window._setDoc = async (path, id, data) => {
-      await setDoc(doc(db, path, id), data);
-    };
-    window._addDoc = async (path, data) => {
-      const ref = await addDoc(collection(db, path), data);
-      return ref.id;
-    };
-    window._updateDoc = async (path, id, data) => {
-      await updateDoc(doc(db, path, id), data);
-    };
-    window._getAll = async (path) => {
-      const snap = await getDocs(collection(db, path));
-      const res = [];
-      snap.forEach(d => res.push({ _id: d.id, ...d.data() }));
-      return res;
+    window._setDoc    = async (path,id,data) => { await setDoc(doc(db,path,id),data); };
+    window._addDoc    = async (path,data)     => { const r=await addDoc(collection(db,path),data); return r.id; };
+    window._updateDoc = async (path,id,data)  => { await updateDoc(doc(db,path,id),data); };
+    window._getAll    = async (path)          => {
+      const snap = await getDocs(collection(db,path));
+      const res=[]; snap.forEach(d=>res.push({_id:d.id,...d.data()})); return res;
     };
 
     window._firebaseReady = true;
   </script>
-
   <style>
-    /* ── RESET ────────────────────────────────────────────────────────────── */
-    *, *::before, *::after {
-      box-sizing: border-box; margin: 0; padding: 0;
-      -webkit-tap-highlight-color: transparent;
+    *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+    :root{
+      --bg:#07090f;--surface:#0d1118;--surface2:#131c28;--border:#1e2d3d;
+      --primary:#0d9488;--primary-h:#0f766e;--primary-glow:rgba(13,148,136,.15);
+      --text:#e2e8f0;--dim:#94a3b8;--muted:#64748b;
+      --green:#22c55e;--amber:#f59e0b;--red:#ef4444;--purple:#8b5cf6;--blue:#0ea5e9;
+      --r:12px;--r-sm:8px;
     }
+    html,body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Inter',system-ui,sans-serif;min-height:100vh;overflow-x:hidden}
+    input,select,button,textarea{font-family:inherit;font-size:15px}
+    input,select{background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-sm);color:var(--text);padding:11px 14px;width:100%}
+    input:focus,select:focus{outline:2px solid var(--primary);outline-offset:2px}
+    input::placeholder{color:var(--muted)}
+    button{cursor:pointer;touch-action:manipulation}
 
-    /* ── THEME TOKENS ─────────────────────────────────────────────────────── */
-    :root {
-      --bg:           #07090f;
-      --surface:      #0d1118;
-      --surface2:     #131c28;
-      --border:       #1e2d3d;
-      --primary:      #0d9488;
-      --primary-h:    #0f766e;
-      --primary-glow: rgba(13,148,136,.15);
-      --text:         #e2e8f0;
-      --dim:          #94a3b8;
-      --muted:        #64748b;
-      --green:        #22c55e;
-      --amber:        #f59e0b;
-      --red:          #ef4444;
-      --r:            12px;
-      --r-sm:         8px;
-    }
+    /* ── AUTH SCREENS ── */
+    .auth-screen{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px 20px 56px}
+    .auth-card{width:100%;max-width:400px}
+    .logo{display:flex;align-items:center;gap:11px;margin-bottom:32px}
+    .logo-mark{width:42px;height:42px;background:var(--primary);border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0}
+    .logo-word{font-size:26px;font-weight:800;letter-spacing:-.8px;color:var(--text)}
+    .logo-word em{font-style:normal;color:var(--primary)}
+    .a-title{font-size:22px;font-weight:700;margin-bottom:6px}
+    .a-sub{font-size:14px;color:var(--muted);margin-bottom:24px;line-height:1.55}
+    .field{margin-bottom:14px}
+    .field label{display:block;font-size:11px;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px}
+    .btn{width:100%;padding:14px;border:none;border-radius:var(--r);font-size:15px;font-weight:700;cursor:pointer;display:block;text-align:center;transition:opacity .15s,transform .1s}
+    .btn:active{transform:scale(.98)}
+    .btn:disabled{opacity:.45;cursor:not-allowed}
+    .btn+.btn{margin-top:10px}
+    .btn-primary{background:var(--primary);color:#fff}
+    .btn-primary:hover:not(:disabled){background:var(--primary-h)}
+    .btn-ghost{background:var(--surface2);color:var(--text);border:1px solid var(--border)}
+    .btn-green{background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff}
+    .btn-amber{background:var(--amber);color:#000}
+    .btn-red{background:var(--red);color:#fff}
+    .btn-purple{background:linear-gradient(135deg,#8b5cf6,#6d28d9);color:#fff}
+    .btn-blue{background:linear-gradient(135deg,#0ea5e9,#2563eb);color:#fff}
+    .link-row{text-align:center;margin-top:18px;font-size:14px;color:var(--muted)}
+    .link-row a{color:var(--primary);text-decoration:none;font-weight:600;cursor:pointer}
+    .choice-card{background:var(--surface);border:2px solid var(--border);border-radius:var(--r);padding:20px;cursor:pointer;margin-bottom:12px;transition:border-color .15s,background .15s}
+    .choice-card:hover{border-color:var(--primary);background:var(--primary-glow)}
+    .choice-icon{font-size:26px;margin-bottom:8px}
+    .choice-title{font-size:16px;font-weight:700;color:var(--text);margin-bottom:4px}
+    .choice-sub{font-size:13px;color:var(--muted);line-height:1.4}
+    .invite-banner{background:var(--primary-glow);border:1px solid var(--primary);border-radius:var(--r-sm);padding:12px 14px;margin-bottom:20px;font-size:13px;color:var(--primary);font-weight:600;line-height:1.4}
+    .spinner{width:40px;height:40px;border:3px solid var(--border);border-top-color:var(--primary);border-radius:50%;animation:spin .7s linear infinite;margin:0 auto 16px}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .pill{display:inline-block;background:var(--primary-glow);color:var(--primary);border:1px solid var(--primary);border-radius:20px;padding:4px 14px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:16px}
 
-    html, body {
-      background: var(--bg);
-      color: var(--text);
-      font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', system-ui, sans-serif;
-      min-height: 100vh;
-      overflow-x: hidden;
-    }
+    /* ── MAIN APP ── */
+    .page{min-height:100vh;background:var(--bg);padding-bottom:80px}
+    .topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:12px 16px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+    .topbar-logo{display:flex;align-items:center;gap:8px}
+    .topbar-mark{width:28px;height:28px;background:var(--primary);border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:14px}
+    .topbar-name{font-size:16px;font-weight:800;letter-spacing:-.4px}
+    .topbar-name em{font-style:normal;color:var(--primary)}
+    .topbar-org{font-size:12px;color:var(--muted);font-weight:500}
+    .content{max-width:480px;margin:0 auto;padding:16px}
+    .card{background:var(--surface);border-radius:var(--r);border:1px solid var(--border);padding:14px 16px;margin-bottom:8px}
+    .label{color:var(--dim);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:6px}
+    .badge{font-size:10px;font-weight:700;padding:3px 8px;border-radius:5px}
+    .mb8{margin-bottom:8px}.mb16{margin-bottom:16px}.mb20{margin-bottom:20px}
 
-    input, select, button, textarea { font-family: inherit; font-size: 15px; }
+    /* stat cards */
+    .stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}
+    .stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px;text-align:center}
+    .stat-num{font-size:28px;font-weight:800;line-height:1}
+    .stat-label{font-size:11px;color:var(--muted);font-weight:600;margin-top:4px;text-transform:uppercase;letter-spacing:.06em}
 
-    /* ── LAYOUT ───────────────────────────────────────────────────────────── */
-    .screen {
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      padding: 24px 20px 56px;
-    }
+    /* action buttons */
+    .action-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px}
+    .action-btn{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px 8px;display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;transition:border-color .15s,background .15s}
+    .action-btn:hover{border-color:var(--primary);background:var(--primary-glow)}
+    .action-btn .ab-icon{font-size:22px}
+    .action-btn .ab-label{font-size:11px;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.05em;text-align:center}
 
-    .card {
-      width: 100%;
-      max-width: 400px;
-    }
+    /* bottom tabs */
+    .tabbar{position:fixed;bottom:0;left:0;right:0;background:var(--surface);border-top:1px solid var(--border);display:flex;z-index:200;padding-bottom:env(safe-area-inset-bottom)}
+    .tab-btn{flex:1;padding:12px 0 10px;border:none;background:transparent;font-size:10px;font-weight:700;color:var(--muted);cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;text-transform:uppercase;letter-spacing:.05em;transition:color .15s}
+    .tab-btn.active{color:var(--primary)}
+    .tab-btn .tab-icon{font-size:20px}
 
-    /* ── LOGO ─────────────────────────────────────────────────────────────── */
-    .logo {
-      display: flex;
-      align-items: center;
-      gap: 11px;
-      margin-bottom: 32px;
-    }
+    /* items */
+    .item-row{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:12px 14px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;transition:border-color .15s}
+    .item-row:hover{border-color:var(--primary)}
+    .item-name{font-weight:700;font-size:14px;color:var(--text);margin-bottom:2px}
+    .item-meta{font-size:12px;color:var(--muted)}
+    .status-badge{font-size:10px;font-weight:700;padding:3px 8px;border-radius:5px;text-transform:uppercase;letter-spacing:.04em}
+    .status-active{background:rgba(34,197,94,.15);color:#22c55e}
+    .status-used{background:rgba(245,158,11,.15);color:#f59e0b}
+    .status-transit{background:rgba(139,92,246,.15);color:#8b5cf6}
+    .status-expired{background:rgba(239,68,68,.15);color:#ef4444}
 
-    .logo-mark {
-      width: 42px; height: 42px;
-      background: var(--primary);
-      border-radius: 11px;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 22px;
-      flex-shrink: 0;
-    }
+    /* overlay / modal */
+    .overlay{position:fixed;inset:0;background:rgba(0,0,0,.85);display:flex;align-items:flex-end;justify-content:center;z-index:500}
+    .overlay-inner{width:100%;max-width:480px;background:var(--surface);border-radius:20px 20px 0 0;padding:24px 20px 48px;border:1px solid var(--border);max-height:85vh;overflow-y:auto;position:relative}
+    .overlay-center{position:fixed;inset:0;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;z-index:500;padding:20px}
+    .modal-title{font-size:18px;font-weight:700;margin-bottom:4px}
+    .modal-sub{font-size:13px;color:var(--muted);margin-bottom:20px}
 
-    .logo-wordmark {
-      font-size: 26px;
-      font-weight: 800;
-      letter-spacing: -0.8px;
-      color: var(--text);
-    }
+    /* scanner */
+    .scan-page{position:fixed;inset:0;background:#000;z-index:1000;display:flex;flex-direction:column;align-items:center;justify-content:center}
+    .scan-video{width:100%;max-height:60vh;object-fit:cover}
+    .scan-canvas{display:none}
+    .scan-status{color:#fff;font-size:14px;font-weight:600;margin:12px 0;text-align:center;padding:0 20px}
+    .scan-hint{color:rgba(255,255,255,.6);font-size:12px;margin-bottom:12px;text-align:center}
+    .scan-manual{width:100%;max-width:340px;padding:0 20px}
+    .scan-manual input{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:#fff;border-radius:var(--r-sm);padding:12px 14px;width:100%}
+    .scan-manual input::placeholder{color:rgba(255,255,255,.4)}
+    .scan-close{position:absolute;top:16px;right:16px;background:rgba(255,255,255,.1);border:none;color:#fff;font-size:20px;border-radius:8px;padding:8px 12px;cursor:pointer}
 
-    .logo-wordmark em {
-      font-style: normal;
-      color: var(--primary);
-    }
+    /* toast */
+    .toast{position:fixed;bottom:96px;left:50%;transform:translateX(-50%);padding:13px 24px;border-radius:12px;font-weight:600;font-size:14px;z-index:9999;max-width:88vw;text-align:center;box-shadow:0 4px 24px rgba(0,0,0,.5);white-space:nowrap;pointer-events:none}
 
-    /* ── TYPOGRAPHY ───────────────────────────────────────────────────────── */
-    .title  { font-size: 22px; font-weight: 700; color: var(--text);  margin-bottom: 6px; }
-    .sub    { font-size: 14px; color: var(--muted); margin-bottom: 28px; line-height: 1.55; }
+    /* full-page modal */
+    .full-page{position:fixed;inset:0;background:var(--bg);z-index:1000;overflow-y:auto}
+    .full-inner{max-width:480px;margin:0 auto;padding:24px 20px}
 
-    /* ── FORM ─────────────────────────────────────────────────────────────── */
-    .field { margin-bottom: 14px; }
+    /* section header */
+    .section-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+    .section-title{font-size:14px;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.06em}
 
-    .field label {
-      display: block;
-      font-size: 11px;
-      font-weight: 700;
-      color: var(--dim);
-      text-transform: uppercase;
-      letter-spacing: .07em;
-      margin-bottom: 6px;
-    }
+    /* search */
+    .search-wrap{position:relative;margin-bottom:12px}
+    .search-wrap input{padding-left:36px}
+    .search-icon{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:14px;pointer-events:none}
 
-    .field input {
-      width: 100%;
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      border-radius: var(--r-sm);
-      color: var(--text);
-      padding: 12px 14px;
-      transition: border-color .15s, box-shadow .15s;
-    }
+    /* expiry alert */
+    .expiry-banner{background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.3);border-radius:var(--r);padding:12px 14px;margin-bottom:12px;display:flex;align-items:center;gap:10px;cursor:pointer}
+    .expiry-banner-text{font-size:13px;font-weight:600;color:var(--red)}
 
-    .field input:focus {
-      outline: none;
-      border-color: var(--primary);
-      box-shadow: 0 0 0 3px var(--primary-glow);
-    }
+    /* log */
+    .log-row{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:8px;display:flex;gap:12px;align-items:flex-start}
 
-    .field input::placeholder { color: var(--muted); }
+    /* settings */
+    .settings-row{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px 16px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;cursor:pointer}
+    .settings-row:hover{border-color:var(--primary)}
+    .settings-label{font-size:14px;font-weight:600}
+    .settings-value{font-size:13px;color:var(--muted)}
 
-    /* ── BUTTONS ──────────────────────────────────────────────────────────── */
-    .btn {
-      width: 100%; padding: 14px;
-      border: none; border-radius: var(--r);
-      font-size: 15px; font-weight: 700;
-      cursor: pointer; display: block;
-      text-align: center;
-      transition: opacity .15s, transform .1s, background .15s;
-    }
-
-    .btn:active  { transform: scale(.98); }
-    .btn:disabled { opacity: .45; cursor: not-allowed; }
-    .btn + .btn  { margin-top: 10px; }
-
-    .btn-primary { background: var(--primary); color: #fff; }
-    .btn-primary:hover:not(:disabled) { background: var(--primary-h); }
-
-    .btn-ghost {
-      background: var(--surface2);
-      color: var(--text);
-      border: 1px solid var(--border);
-    }
-    .btn-ghost:hover:not(:disabled) { background: var(--border); }
-
-    /* ── LINKS ────────────────────────────────────────────────────────────── */
-    .link-row {
-      text-align: center;
-      margin-top: 18px;
-      font-size: 14px;
-      color: var(--muted);
-    }
-
-    .link-row a {
-      color: var(--primary);
-      text-decoration: none;
-      font-weight: 600;
-      cursor: pointer;
-    }
-
-    .link-row a:hover { text-decoration: underline; }
-
-    /* ── CHOICE CARDS (org setup) ─────────────────────────────────────────── */
-    .choice-card {
-      background: var(--surface);
-      border: 2px solid var(--border);
-      border-radius: var(--r);
-      padding: 20px;
-      cursor: pointer;
-      margin-bottom: 12px;
-      transition: border-color .15s, background .15s;
-    }
-
-    .choice-card:hover { border-color: var(--primary); background: var(--primary-glow); }
-
-    .choice-icon  { font-size: 26px; margin-bottom: 8px; }
-    .choice-title { font-size: 16px; font-weight: 700; color: var(--text); margin-bottom: 4px; }
-    .choice-sub   { font-size: 13px; color: var(--muted); line-height: 1.4; }
-
-    /* ── INVITE BANNER ────────────────────────────────────────────────────── */
-    .invite-banner {
-      background: var(--primary-glow);
-      border: 1px solid var(--primary);
-      border-radius: var(--r-sm);
-      padding: 12px 14px;
-      margin-bottom: 20px;
-      font-size: 13px;
-      color: var(--primary);
-      font-weight: 600;
-      line-height: 1.4;
-    }
-
-    /* ── SPINNER ──────────────────────────────────────────────────────────── */
-    .spinner {
-      width: 40px; height: 40px;
-      border: 3px solid var(--border);
-      border-top-color: var(--primary);
-      border-radius: 50%;
-      animation: spin .7s linear infinite;
-      margin: 0 auto 16px;
-    }
-
-    @keyframes spin { to { transform: rotate(360deg); } }
-
-    /* ── SUCCESS / PLACEHOLDER ────────────────────────────────────────────── */
-    .big-check { font-size: 52px; margin-bottom: 16px; }
-
-    .pill {
-      display: inline-block;
-      background: var(--primary-glow);
-      color: var(--primary);
-      border: 1px solid var(--primary);
-      border-radius: 20px;
-      padding: 4px 14px;
-      font-size: 11px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: .08em;
-      margin-bottom: 16px;
-    }
-
-    .info-row {
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      border-radius: var(--r-sm);
-      padding: 10px 14px;
-      margin: 8px 0;
-      font-size: 13px;
-      color: var(--dim);
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-
-    .info-row strong { color: var(--text); }
-
-    /* ── TOAST ────────────────────────────────────────────────────────────── */
-    .toast {
-      position: fixed;
-      bottom: 32px;
-      left: 50%;
-      transform: translateX(-50%);
-      padding: 13px 24px;
-      border-radius: 12px;
-      font-weight: 600;
-      font-size: 14px;
-      z-index: 9999;
-      max-width: 88vw;
-      text-align: center;
-      box-shadow: 0 4px 24px rgba(0,0,0,.5);
-      white-space: nowrap;
-      pointer-events: none;
-    }
+    @media print{body *{visibility:hidden}#print-area,#print-area *{visibility:visible}#print-area{position:absolute;left:0;top:0;padding:20px;text-align:center}}
   </style>
 </head>
 <body>
 <div id="app"></div>
+<div id="print-area" style="display:none"></div>
 
 <script>
-// ── WAIT FOR FIREBASE MODULE ───────────────────────────────────────────────────
-async function waitForFirebase() {
-  let t = 0;
-  while (!window._firebaseReady && t < 100) {
-    await new Promise(r => setTimeout(r, 100));
-    t++;
+// ── FIREBASE WAIT ─────────────────────────────────────────────────────────────
+async function waitForFirebase(){
+  let t=0;
+  while(!window._firebaseReady&&t<100){await new Promise(r=>setTimeout(r,100));t++;}
+  if(!window._firebaseReady)throw new Error("Firebase failed to load");
+}
+
+// ── DATE HELPER ───────────────────────────────────────────────────────────────
+function formatDate(ts){
+  if(!ts)return"";
+  try{
+    const tz=Intl.DateTimeFormat().resolvedOptions().timeZone;
+    return new Date(ts).toLocaleString("en-US",{timeZone:tz,month:"short",day:"numeric",year:"numeric",hour:"numeric",minute:"2-digit",hour12:true});
+  }catch(e){return ts;}
+}
+
+// ── TENANT-SCOPED FIRESTORE HELPERS ──────────────────────────────────────────
+function tCol(col){return`tenants/${S.profile.tenantId}/${col}`;}
+
+async function getItems()  {return window._getAll(tCol("items"));}
+async function getOwners() {return window._getAll(tCol("owners"));}
+async function getLog()    {return window._getAll(tCol("log"));}
+async function getOrders() {return window._getAll(tCol("orders"));}
+async function getTenantUsers(){return window._getAll(tCol("users"));}
+
+async function addItem(item)              {await window._setDoc(tCol("items"),item.barcode,item);}
+async function updateItem(barcode,data)   {await window._updateDoc(tCol("items"),barcode,data);}
+async function addLog(entry)              {await window._addDoc(tCol("log"),entry);}
+async function addOrder(order)            {await window._setDoc(tCol("orders"),order.id,order);}
+async function updateOrder(id,data)       {await window._updateDoc(tCol("orders"),id,data);}
+
+// ── STATE ─────────────────────────────────────────────────────────────────────
+const S={
+  // Auth state
+  screen:"loading",          // loading|login|signup|forgot|org-setup|create-org|join-org|app
+  user:null,                 // Firebase Auth user
+  profile:null,              // /users/{uid}
+  tenant:null,               // /tenants/{tenantId}
+  inviteCode:null,
+  inviteData:null,
+
+  // App state
+  tab:"dashboard",
+  owners:[],items:[],log:[],orders:[],tenantUsers:[],
+  loading:false,
+  toast:null,toastTimer:null,
+  inventorySearch:"",
+  selectedOwner:null,
+  modal:null,
+  scanning:false,scanMode:null,scanHint:"",
+
+  // Multi-scan
+  multiMode:false,
+  multiDetails:null,
+  multiCodes:[],
+  showMultiDetails:false,
+  showMultiScan:false,
+  showMultiConfirm:false,
+
+  // Orders
+  activeOrder:null,
+  orderItems:[],
+  showOrderItemScan:false,
+  showOrderQRScan:false,
+  showOrderSummary:false,
+  pendingOrderQR:null,
+};
+
+function setState(u){Object.assign(S,u);render();}
+function showToast(msg,type="ok"){
+  if(S.toastTimer)clearTimeout(S.toastTimer);
+  const t=setTimeout(()=>setState({toast:null,toastTimer:null}),3500);
+  setState({toast:{msg,type},toastTimer:t});
+}
+
+// ── DATA LOAD ─────────────────────────────────────────────────────────────────
+async function loadData(){
+  setState({loading:true});
+  try{
+    const [oR,iR,lR,ordR,uR]=await Promise.allSettled([getOwners(),getItems(),getLog(),getOrders(),getTenantUsers()]);
+    const owners = oR.status==="fulfilled"?oR.value:S.owners;
+    const items  = iR.status==="fulfilled"?iR.value:S.items;
+    const log    = lR.status==="fulfilled"?lR.value:S.log;
+    const orders = ordR.status==="fulfilled"?ordR.value:S.orders;
+    const tenantUsers = uR.status==="fulfilled"?uR.value:S.tenantUsers;
+    setState({
+      owners:owners.map(o=>({id:o._id||o.id,name:o.name,type:o.type})),
+      items:items.map(i=>({barcode:i._id||i.barcode,name:i.name,type:i.type,expDate:i.expDate||"",ownerId:i.ownerId,status:i.status||"active",addedAt:i.addedAt,usedBy:i.usedBy||""})),
+      log:log.map(l=>({ts:l.ts,action:l.action,barcode:l.barcode,itemName:l.itemName,from:l.from,to:l.to,user:l.user})).sort((a,b)=>new Date(b.ts)-new Date(a.ts)),
+      orders:orders.map(o=>({id:o._id||o.id,name:o.name,count:o.count,createdBy:o.createdBy,createdAt:o.createdAt,status:o.status,items:o.items||""})),
+      tenantUsers:tenantUsers.map(u=>({uid:u._id,displayName:u.displayName,email:u.email,role:u.role,ownerId:u.ownerId})),
+      loading:false
+    });
+  }catch(e){console.error("Load failed:",e);showToast("Could not load data","err");setState({loading:false});}
+}
+
+// ── ACTIONS ───────────────────────────────────────────────────────────────────
+async function submitCheckin(barcode,name,type,expDate,ownerId){
+  const now=new Date().toISOString();
+  const ownerName=S.owners.find(o=>o.id===ownerId)?.name||ownerId;
+  const newItem={barcode,name,type,expDate,ownerId,status:"active",addedAt:now,usedBy:""};
+  setState({items:[...S.items,newItem]});
+  addItem(newItem);
+  addLog({ts:now,action:"CHECK_IN",barcode,itemName:name,from:S.activeOrder?S.activeOrder.id:"",to:ownerName,user:S.profile.displayName});
+}
+
+async function submitMultiCheckin(){
+  const {multiDetails,multiCodes,profile,owners,activeOrder}=S;
+  setState({loading:true,showMultiConfirm:false});
+  const pool=owners.find(o=>o.id.toUpperCase()==="POOL")||owners[0];
+  const now=new Date().toISOString();
+  try{
+    for(const barcode of multiCodes){
+      await addItem({barcode,name:multiDetails.name,type:multiDetails.type,expDate:multiDetails.expDate,ownerId:pool.id,status:"active",addedAt:now,usedBy:""});
+      await addLog({ts:now,action:"CHECK_IN",barcode,itemName:multiDetails.name,from:"",to:pool.name,user:profile.displayName});
+    }
+    showToast(`✅ ${multiCodes.length} items checked in to ${pool.name}`);
+    setState({multiMode:false,multiDetails:null,multiCodes:[],showMultiDetails:false,showMultiScan:false,showMultiConfirm:false,loading:false,scanning:false});
+  }catch(e){showToast("Multi-checkin failed: "+e.message,"err");setState({loading:false});}
+}
+
+async function submitCheckout(item,usedBy){
+  const now=new Date().toISOString();
+  const ownerName=S.owners.find(o=>o.id===item.ownerId)?.name||item.ownerId;
+  const updatedItems=S.items.map(i=>i.barcode===item.barcode?{...i,status:"used",usedBy}:i);
+  setState({items:updatedItems});
+  showToast("📤 "+item.name+" checked out");
+  updateItem(item.barcode,{status:"used",usedBy})
+    .then(()=>addLog({ts:now,action:"CHECK_OUT",barcode:item.barcode,itemName:item.name,from:ownerName,to:usedBy,user:S.profile.displayName}))
+    .catch(e=>showToast("Failed: "+e.message,"err"));
+}
+
+async function submitUndoCheckout(item){
+  const now=new Date().toISOString();
+  const itemLog=S.log.filter(l=>l.barcode===item.barcode);
+  const checkoutEntry=itemLog.find(l=>l.action==="CHECK_OUT");
+  let returnOwner=null;
+  if(checkoutEntry&&checkoutEntry.from){
+    const fromVal=checkoutEntry.from.trim().toLowerCase();
+    returnOwner=S.owners.find(o=>o.name.trim().toLowerCase()===fromVal||o.id.trim().toLowerCase()===fromVal);
   }
-  if (!window._firebaseReady) throw new Error("Firebase failed to load.");
+  if(!returnOwner)returnOwner=S.owners.find(o=>o.id.toUpperCase()==="POOL")||S.owners[0];
+  const updatedItems=S.items.map(i=>i.barcode===item.barcode?{...i,status:"active",ownerId:returnOwner.id,usedBy:""}:i);
+  setState({items:updatedItems});
+  showToast("↩️ "+item.name+" returned to "+returnOwner.name);
+  updateItem(item.barcode,{status:"active",ownerId:returnOwner.id,usedBy:""})
+    .then(()=>addLog({ts:now,action:"UNDO_CHECKOUT",barcode:item.barcode,itemName:item.name,from:"USED",to:returnOwner.name,user:S.profile.displayName}))
+    .catch(e=>showToast("Failed: "+e.message,"err"));
 }
 
-// ── STATE ──────────────────────────────────────────────────────────────────────
-const S = {
-  screen:     'loading',  // loading | login | signup | forgot | org-setup | create-org | join-org | app
-  user:       null,       // Firebase Auth user
-  profile:    null,       // /users/{uid} doc
-  tenant:     null,       // /tenants/{tenantId} doc
-  inviteCode: null,       // from ?invite= URL param
-  inviteData: null,       // fetched invite document
-  toast:      null,
-  toastTimer: null,
-};
-
-function setState(patch) { Object.assign(S, patch); render(); }
-
-function showToast(msg, type = 'ok') {
-  if (S.toastTimer) clearTimeout(S.toastTimer);
-  const t = setTimeout(() => setState({ toast: null, toastTimer: null }), 3500);
-  setState({ toast: { msg, type }, toastTimer: t });
+async function submitTransfer(item,toOwnerId){
+  const now=new Date().toISOString();
+  const fromName=S.owners.find(o=>o.id===item.ownerId)?.name||item.ownerId;
+  const toName=S.owners.find(o=>o.id===toOwnerId)?.name||toOwnerId;
+  const updatedItems=S.items.map(i=>i.barcode===item.barcode?{...i,ownerId:toOwnerId}:i);
+  setState({items:updatedItems});
+  showToast("🔄 "+item.name+" transferred to "+toName);
+  updateItem(item.barcode,{ownerId:toOwnerId})
+    .then(()=>addLog({ts:now,action:"TRANSFER",barcode:item.barcode,itemName:item.name,from:fromName,to:toName,user:S.profile.displayName}))
+    .catch(e=>showToast("Failed: "+e.message,"err"));
 }
 
-// ── ROUTER ─────────────────────────────────────────────────────────────────────
-const screens = {
-  loading:      renderLoading,
-  login:        renderLogin,
-  signup:       renderSignup,
-  forgot:       renderForgot,
-  'org-setup':  renderOrgSetup,
-  'create-org': renderCreateOrg,
-  'join-org':   renderJoinOrg,
-  app:          renderAppPlaceholder,
-};
+async function submitReceiveOrder(order,barcodes,toOwnerId){
+  const now=new Date().toISOString();
+  const toOwner=S.owners.find(o=>o.id===toOwnerId)||S.owners[0];
+  setState({loading:true});
+  try{
+    for(const barcode of barcodes){
+      await updateItem(barcode,{ownerId:toOwnerId,status:"active"});
+      await addLog({ts:now,action:"ORDER_IN",barcode,itemName:S.items.find(i=>i.barcode===barcode)?.name||barcode,from:"TRANSIT",to:toOwner.name,user:S.profile.displayName});
+    }
+    await updateOrder(order.id,{status:"received"});
+    showToast(`📦 Order received — ${barcodes.length} items to ${toOwner.name}`);
+    setState({loading:false,modal:null});
+    loadData();
+  }catch(e){showToast("Failed: "+e.message,"err");setState({loading:false});}
+}
 
-function render() {
-  const app = document.getElementById('app');
-  const fn  = screens[S.screen];
-  if (fn) { app.innerHTML = ''; app.appendChild(fn()); }
+async function submitCreateOrder(orderName,orderItems,orderQR){
+  const now=new Date().toISOString();
+  setState({loading:true});
+  try{
+    await addOrder({id:orderQR,name:orderName,count:orderItems.length,createdBy:S.profile.displayName,createdAt:now,status:"pending",items:orderItems.join(",")});
+    for(const barcode of orderItems){
+      await updateItem(barcode,{status:"transit"});
+      await addLog({ts:now,action:"ORDER_OUT",barcode,itemName:S.items.find(i=>i.barcode===barcode)?.name||barcode,from:S.owners.find(o=>o.id===S.items.find(i=>i.barcode===barcode)?.ownerId)?.name||"",to:"TRANSIT",user:S.profile.displayName});
+    }
+    showToast(`🚚 Order "${orderName}" created — ${orderItems.length} items in transit`);
+    setState({loading:false,showOrderSummary:false,orderItems:[],pendingOrderQR:null,showOrderItemScan:false,showOrderQRScan:false,activeOrder:null});
+    loadData();
+  }catch(e){showToast("Failed: "+e.message,"err");setState({loading:false});}
+}
+
+// ── SCANNER ───────────────────────────────────────────────────────────────────
+let scanStream=null,scanInterval=null;
+function startScanner(){
+  const video=document.getElementById("scan-video");
+  const canvas=document.getElementById("scan-canvas");
+  const status=document.getElementById("scan-status");
+  if(!video||!canvas)return;
+  navigator.mediaDevices.getUserMedia({video:{facingMode:"environment",width:{ideal:1280},height:{ideal:720}}})
+    .then(stream=>{
+      scanStream=stream;video.srcObject=stream;video.play();
+      if(window.jsQR){
+        if(status)status.textContent=S.scanHint||"Point camera at QR code";
+        scanInterval=setInterval(()=>{
+          if(video.readyState!==4)return;
+          const size=Math.min(video.videoWidth,video.videoHeight)*.8;
+          const x=(video.videoWidth-size)/2,y=(video.videoHeight-size)/2;
+          canvas.width=size;canvas.height=size;
+          const ctx=canvas.getContext("2d");
+          ctx.drawImage(video,x,y,size,size,0,0,size,size);
+          const img=ctx.getImageData(0,0,size,size);
+          const code=window.jsQR(img.data,img.width,img.height,{inversionAttempts:"dontInvert"});
+          if(code&&code.data)handleScan(code.data);
+        },150);
+      }else{if(status)status.textContent="Type code below";}
+    })
+    .catch(()=>{const s=document.getElementById("scan-status");if(s)s.textContent="Camera unavailable — type code below";});
+}
+function stopScanner(){
+  clearInterval(scanInterval);scanInterval=null;
+  if(scanStream){scanStream.getTracks().forEach(t=>t.stop());scanStream=null;}
+}
+
+function handleScan(barcode){
+  const {items,scanMode,activeOrder,multiCodes,showMultiScan,showOrderItemScan,showOrderQRScan}=S;
+  if(showOrderItemScan){
+    const item=items.find(i=>i.barcode===barcode);
+    if(item){
+      if(item.status==="used"){showToast("Already used","warn");setState({scanning:true});return;}
+      if(item.status==="transit"){showToast("In transit","warn");setState({scanning:true});return;}
+      if(S.orderItems.includes(barcode)){showToast("Already added","warn");setState({scanning:true});return;}
+      const newItems=[...S.orderItems,barcode];
+      setState({orderItems:newItems,scanning:true});
+      showToast("📦 "+newItems.length+" item"+(newItems.length>1?"s":"")+" added");
+    }else{showToast("Item not found","err");setState({scanning:true});}
+    return;
+  }
+  if(showOrderQRScan){
+    if(S.orders.find(o=>o.id===barcode)){showToast("Already an order","err");setState({scanning:true});return;}
+    const existing=items.find(i=>i.barcode===barcode);
+    if(existing&&existing.status==="active"&&!S.orderItems.includes(barcode)){showToast("Belongs to an active item","warn");setState({scanning:true});return;}
+    setState({scanning:false,showOrderQRScan:false,pendingOrderQR:barcode,showOrderSummary:true});
+    return;
+  }
+  if(showMultiScan){
+    if(items.find(i=>i.barcode===barcode)){showToast("Already tracked","warn");setState({scanning:true});return;}
+    if(multiCodes.includes(barcode)){showToast("Already scanned","warn");setState({scanning:true});return;}
+    const newCodes=[...multiCodes,barcode];
+    setState({multiCodes:newCodes,scanning:true});
+    showToast(`📦 Code ${newCodes.length} scanned`);
+    return;
+  }
+  setState({scanning:false});
+  if(scanMode==="order"&&!activeOrder){
+    const order=S.orders.find(o=>o.id===barcode);
+    if(!order){showToast("Order not found","err");return;}
+    setState({activeOrder:order,scanning:true,scanHint:"Scan items to add to order"});
+    showToast(`📦 Order: ${order.name}`);
+    return;
+  }
+  if(scanMode==="order"&&activeOrder){
+    if(items.find(i=>i.barcode===barcode)){showToast("Already tracked","warn");setState({scanning:true});return;}
+    setState({modal:{type:"checkin",barcode,orderMode:true}});return;
+  }
+  if(scanMode==="checkin"){
+    if(items.find(i=>i.barcode===barcode)){showToast("Already tracked","warn");return;}
+    setState({modal:{type:"checkin",barcode,orderMode:false}});return;
+  }
+  if(scanMode==="checkout"){
+    const item=items.find(i=>i.barcode===barcode);
+    if(!item){showToast("Item not found","err");return;}
+    if(item.status==="used"){showToast("Already checked out","warn");return;}
+    if(S.profile.role!=="admin"&&item.ownerId!==S.profile.ownerId){showToast("Not in your inventory","err");return;}
+    setState({modal:{type:"checkout",item}});return;
+  }
+  if(scanMode==="transfer"){
+    const order=S.orders.find(o=>o.id===barcode);
+    if(order){
+      if(order.status==="received"){showToast("Already received","warn");return;}
+      const barcodes=(order.items||"").split(",").filter(b=>b.trim());
+      if(barcodes.length===0){showToast("Order has no items","warn");return;}
+      setState({modal:{type:"receive_order",order,barcodes,toOwnerId:S.profile.role==="admin"?"":S.profile.ownerId}});
+      return;
+    }
+    const item=items.find(i=>i.barcode===barcode);
+    if(!item){showToast("Item not found","err");return;}
+    if(item.status==="used"){showToast("Already used","warn");return;}
+    if(item.status==="transit"){showToast("In transit — receive order instead","warn");return;}
+    if(S.profile.role!=="admin"&&item.ownerId===S.profile.ownerId){showToast("Already in your inventory","warn");return;}
+    setState({modal:{type:"transfer",item}});
+  }
+}
+
+// ── EL HELPER ─────────────────────────────────────────────────────────────────
+function el(tag,attrs={},...children){
+  const e=document.createElement(tag);
+  for(const[k,v]of Object.entries(attrs)){
+    if(k==="onclick")e.onclick=v;
+    else if(k==="onchange")e.onchange=v;
+    else if(k==="oninput")e.oninput=v;
+    else if(k==="onkeydown")e.onkeydown=v;
+    else if(k==="style")Object.assign(e.style,v);
+    else if(k==="class")e.className=v;
+    else e.setAttribute(k,v);
+  }
+  for(const c of children){
+    if(c==null)continue;
+    if(typeof c==="string"||typeof c==="number")e.appendChild(document.createTextNode(c));
+    else e.appendChild(c);
+  }
+  return e;
+}
+
+function appendHTML(parent,html){const d=document.createElement("div");d.innerHTML=html;while(d.firstChild)parent.appendChild(d.firstChild);}
+function makeScreen(){const s=document.createElement("div");s.className="auth-screen";const c=document.createElement("div");c.className="auth-card";s.appendChild(c);return{screen:s,card:c};}
+function makeLogo(small){
+  if(small){
+    const d=document.createElement("div");d.className="topbar-logo";
+    d.innerHTML=`<div class="topbar-mark">⬡</div><div class="topbar-name">Trax<em>ify</em></div>`;
+    return d;
+  }
+  const d=document.createElement("div");d.className="logo";
+  d.innerHTML=`<div class="logo-mark">⬡</div><div class="logo-word">Trax<em>ify</em></div>`;
+  return d;
+}
+
+// ── RENDER ────────────────────────────────────────────────────────────────────
+function render(){
+  if(S.scanning){renderScanPage();return;}
+  if(S.showMultiDetails){renderMultiDetails();return;}
+  if(S.showMultiScan){renderMultiScan();return;}
+  if(S.showMultiConfirm){renderMultiConfirm();return;}
+  if(S.showOrderItemScan){renderScanPage();return;}
+  if(S.showOrderQRScan){renderScanPage();return;}
+  if(S.showOrderSummary){renderOrderSummary();return;}
+
+  const app=document.getElementById("app");
+  app.innerHTML="";
+
+  const screens={
+    loading:renderLoading,login:renderLogin,signup:renderSignup,
+    forgot:renderForgot,"org-setup":renderOrgSetup,"create-org":renderCreateOrg,
+    "join-org":renderJoinOrg,app:renderApp
+  };
+  const fn=screens[S.screen];
+  if(fn)app.appendChild(fn());
 
   // Toast
-  const old = document.getElementById('__toast');
-  if (old) old.remove();
-  if (S.toast) {
-    const bg = S.toast.type === 'err' ? '#7f1d1d'
-             : S.toast.type === 'warn' ? '#78350f'
-             : '#134e4a';
-    const t = document.createElement('div');
-    t.id = '__toast';
-    t.className = 'toast';
-    t.style.background = bg;
-    t.textContent = S.toast.msg;
+  const old=document.getElementById("__toast");if(old)old.remove();
+  if(S.toast){
+    const bg=S.toast.type==="err"?"#7f1d1d":S.toast.type==="warn"?"#78350f":"#134e4a";
+    const t=document.createElement("div");t.id="__toast";t.className="toast";t.style.background=bg;t.textContent=S.toast.msg;
     document.body.appendChild(t);
   }
 }
 
-// ── LOGO COMPONENT ─────────────────────────────────────────────────────────────
-function makeLogo() {
-  const d = document.createElement('div');
-  d.className = 'logo';
-  d.innerHTML = `
-    <div class="logo-mark">⬡</div>
-    <div class="logo-wordmark">Trax<em>ify</em></div>
-  `;
-  return d;
-}
-
-// Helper: build a screen wrapper + card
-function makeScreen() {
-  const s = document.createElement('div');
-  s.className = 'screen';
-  const c = document.createElement('div');
-  c.className = 'card';
-  s.appendChild(c);
-  return { screen: s, card: c };
-}
-
-// Helper: append a chunk of HTML to a node
-function appendHTML(parent, html) {
-  const div = document.createElement('div');
-  div.innerHTML = html;
-  while (div.firstChild) parent.appendChild(div.firstChild);
-}
-
-// ── SCREEN: LOADING ────────────────────────────────────────────────────────────
-function renderLoading() {
-  const { screen, card } = makeScreen();
-  card.style.textAlign = 'center';
-  card.appendChild(makeLogo());
-  appendHTML(card, `
-    <div class="spinner"></div>
-    <div style="color:var(--muted);font-size:14px">Loading…</div>
-  `);
+// ── AUTH SCREENS ──────────────────────────────────────────────────────────────
+function renderLoading(){
+  const{screen,card}=makeScreen();card.style.textAlign="center";card.appendChild(makeLogo());
+  appendHTML(card,`<div class="spinner"></div><div style="color:var(--muted);font-size:14px">Loading…</div>`);
   return screen;
 }
 
-// ── SCREEN: LOGIN ──────────────────────────────────────────────────────────────
-function renderLogin() {
-  const { screen, card } = makeScreen();
-  card.appendChild(makeLogo());
-
-  if (S.inviteData) {
-    const b = document.createElement('div');
-    b.className = 'invite-banner';
-    b.textContent = `✉️ You've been invited to join ${S.inviteData.tenantName || 'an organization'}. Sign in or create an account below.`;
-    card.appendChild(b);
-  }
-
-  appendHTML(card, `
-    <div class="title">Welcome back</div>
-    <div class="sub">Sign in to your Traxify account</div>
-    <div class="field"><label>Email</label>
-      <input id="li-email" type="email" placeholder="you@company.com" autocomplete="email" />
-    </div>
-    <div class="field"><label>Password</label>
-      <input id="li-pw" type="password" placeholder="••••••••" autocomplete="current-password" />
-    </div>
+function renderLogin(){
+  const{screen,card}=makeScreen();card.appendChild(makeLogo());
+  if(S.inviteData){const b=document.createElement("div");b.className="invite-banner";b.textContent=`✉️ You've been invited to join ${S.inviteData.tenantName||"an organization"}.`;card.appendChild(b);}
+  appendHTML(card,`
+    <div class="a-title">Welcome back</div>
+    <div class="a-sub">Sign in to your Traxify account</div>
+    <div class="field"><label>Email</label><input id="li-email" type="email" placeholder="you@company.com" autocomplete="email"/></div>
+    <div class="field"><label>Password</label><input id="li-pw" type="password" placeholder="••••••••" autocomplete="current-password"/></div>
   `);
-
-  const signInBtn = document.createElement('button');
-  signInBtn.className = 'btn btn-primary';
-  signInBtn.textContent = 'Sign In';
-  card.appendChild(signInBtn);
-
-  appendHTML(card, `
-    <div class="link-row" style="margin-top:14px"><a id="li-forgot">Forgot password?</a></div>
-    <div class="link-row">Don't have an account? <a id="li-signup">Create one</a></div>
-  `);
-
-  async function doLogin() {
-    const email = document.getElementById('li-email')?.value.trim();
-    const pw    = document.getElementById('li-pw')?.value;
-    if (!email || !pw) { showToast('Please fill in all fields', 'warn'); return; }
-    signInBtn.disabled = true; signInBtn.textContent = 'Signing in…';
-    try {
-      await window._signIn(email, pw);
-      // onAuthStateChanged takes it from here
-    } catch(e) {
-      showToast(friendlyError(e.code), 'err');
-      signInBtn.disabled = false; signInBtn.textContent = 'Sign In';
-    }
+  const btn=document.createElement("button");btn.className="btn btn-primary";btn.textContent="Sign In";card.appendChild(btn);
+  appendHTML(card,`<div class="link-row" style="margin-top:14px"><a id="li-forgot">Forgot password?</a></div><div class="link-row">No account? <a id="li-signup">Create one</a></div>`);
+  async function doLogin(){
+    const email=document.getElementById("li-email")?.value.trim();const pw=document.getElementById("li-pw")?.value;
+    if(!email||!pw){showToast("Please fill in all fields","warn");return;}
+    btn.disabled=true;btn.textContent="Signing in…";
+    try{await window._signIn(email,pw);}
+    catch(e){showToast(friendlyError(e.code),"err");btn.disabled=false;btn.textContent="Sign In";}
   }
-
-  signInBtn.addEventListener('click', doLogin);
-  setTimeout(() => {
-    document.getElementById('li-pw')?.addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
-    document.getElementById('li-forgot')?.addEventListener('click', () => setState({ screen: 'forgot' }));
-    document.getElementById('li-signup')?.addEventListener('click', () => setState({ screen: 'signup' }));
-  }, 0);
-
+  btn.addEventListener("click",doLogin);
+  setTimeout(()=>{
+    document.getElementById("li-pw")?.addEventListener("keydown",e=>{if(e.key==="Enter")doLogin();});
+    document.getElementById("li-forgot")?.addEventListener("click",()=>setState({screen:"forgot"}));
+    document.getElementById("li-signup")?.addEventListener("click",()=>setState({screen:"signup"}));
+  },0);
   return screen;
 }
 
-// ── SCREEN: SIGN UP ────────────────────────────────────────────────────────────
-function renderSignup() {
-  const { screen, card } = makeScreen();
-  card.appendChild(makeLogo());
-
-  if (S.inviteData) {
-    const b = document.createElement('div');
-    b.className = 'invite-banner';
-    b.textContent = `✉️ You've been invited to join ${S.inviteData.tenantName || 'an organization'}.`;
-    card.appendChild(b);
-  }
-
-  appendHTML(card, `
-    <div class="title">Create your account</div>
-    <div class="sub">${S.inviteData ? 'Create an account to accept your invitation.' : 'Start tracking inventory with your team.'}</div>
-    <div class="field"><label>Your Name</label>
-      <input id="su-name" type="text" placeholder="Jane Smith" autocomplete="name" />
-    </div>
-    <div class="field"><label>Email</label>
-      <input id="su-email" type="email" placeholder="you@company.com" autocomplete="email" />
-    </div>
-    <div class="field"><label>Password</label>
-      <input id="su-pw" type="password" placeholder="Min 6 characters" autocomplete="new-password" />
-    </div>
-    <div class="field"><label>Confirm Password</label>
-      <input id="su-pw2" type="password" placeholder="Repeat password" autocomplete="new-password" />
-    </div>
+function renderSignup(){
+  const{screen,card}=makeScreen();card.appendChild(makeLogo());
+  if(S.inviteData){const b=document.createElement("div");b.className="invite-banner";b.textContent=`✉️ You've been invited to join ${S.inviteData.tenantName||"an organization"}.`;card.appendChild(b);}
+  appendHTML(card,`
+    <div class="a-title">Create your account</div>
+    <div class="a-sub">${S.inviteData?"Create an account to accept your invitation.":"Start tracking inventory with your team."}</div>
+    <div class="field"><label>Your Name</label><input id="su-name" type="text" placeholder="Jane Smith" autocomplete="name"/></div>
+    <div class="field"><label>Email</label><input id="su-email" type="email" placeholder="you@company.com" autocomplete="email"/></div>
+    <div class="field"><label>Password</label><input id="su-pw" type="password" placeholder="Min 6 characters" autocomplete="new-password"/></div>
+    <div class="field"><label>Confirm Password</label><input id="su-pw2" type="password" placeholder="Repeat password" autocomplete="new-password"/></div>
   `);
-
-  const createBtn = document.createElement('button');
-  createBtn.className = 'btn btn-primary';
-  createBtn.textContent = 'Create Account';
-  card.appendChild(createBtn);
-
-  appendHTML(card, `<div class="link-row">Already have an account? <a id="su-login">Sign in</a></div>`);
-
-  async function doSignup() {
-    const name  = document.getElementById('su-name')?.value.trim();
-    const email = document.getElementById('su-email')?.value.trim();
-    const pw    = document.getElementById('su-pw')?.value;
-    const pw2   = document.getElementById('su-pw2')?.value;
-
-    if (!name || !email || !pw || !pw2) { showToast('Please fill in all fields', 'warn'); return; }
-    if (pw !== pw2)  { showToast('Passwords do not match', 'err'); return; }
-    if (pw.length < 6) { showToast('Password must be at least 6 characters', 'warn'); return; }
-
-    createBtn.disabled = true; createBtn.textContent = 'Creating account…';
-    try {
-      const cred = await window._signUp(email, pw);
-      const uid  = cred.user.uid;
-      const now  = new Date().toISOString();
-
-      // Write user profile — no tenant yet
-      await window._setDoc('users', uid, {
-        displayName: name,
-        email:       email,
-        tenantId:    null,
-        role:        null,
-        ownerId:     null,
-        createdAt:   now,
-      });
-      // onAuthStateChanged fires → sees no tenantId → shows org-setup
-    } catch(e) {
-      showToast(friendlyError(e.code), 'err');
-      createBtn.disabled = false; createBtn.textContent = 'Create Account';
-    }
+  const btn=document.createElement("button");btn.className="btn btn-primary";btn.textContent="Create Account";card.appendChild(btn);
+  appendHTML(card,`<div class="link-row">Already have an account? <a id="su-login">Sign in</a></div>`);
+  async function doSignup(){
+    const name=document.getElementById("su-name")?.value.trim();const email=document.getElementById("su-email")?.value.trim();
+    const pw=document.getElementById("su-pw")?.value;const pw2=document.getElementById("su-pw2")?.value;
+    if(!name||!email||!pw||!pw2){showToast("Please fill in all fields","warn");return;}
+    if(pw!==pw2){showToast("Passwords do not match","err");return;}
+    if(pw.length<6){showToast("Password must be at least 6 characters","warn");return;}
+    btn.disabled=true;btn.textContent="Creating account…";
+    try{
+      const cred=await window._signUp(email,pw);
+      await window._setDoc("users",cred.user.uid,{displayName:name,email,tenantId:null,role:null,ownerId:null,createdAt:new Date().toISOString()});
+    }catch(e){showToast(friendlyError(e.code),"err");btn.disabled=false;btn.textContent="Create Account";}
   }
-
-  createBtn.addEventListener('click', doSignup);
-  setTimeout(() => {
-    document.getElementById('su-login')?.addEventListener('click', () => setState({ screen: 'login' }));
-    document.getElementById('su-pw2')?.addEventListener('keydown', e => { if (e.key === 'Enter') doSignup(); });
-  }, 0);
-
+  btn.addEventListener("click",doSignup);
+  setTimeout(()=>{
+    document.getElementById("su-login")?.addEventListener("click",()=>setState({screen:"login"}));
+    document.getElementById("su-pw2")?.addEventListener("keydown",e=>{if(e.key==="Enter")doSignup();});
+  },0);
   return screen;
 }
 
-// ── SCREEN: FORGOT PASSWORD ────────────────────────────────────────────────────
-function renderForgot() {
-  const { screen, card } = makeScreen();
-  card.appendChild(makeLogo());
-
-  appendHTML(card, `
-    <div class="title">Reset your password</div>
-    <div class="sub">Enter your email and we'll send you a reset link.</div>
-    <div class="field"><label>Email</label>
-      <input id="fp-email" type="email" placeholder="you@company.com" autocomplete="email" />
-    </div>
+function renderForgot(){
+  const{screen,card}=makeScreen();card.appendChild(makeLogo());
+  appendHTML(card,`
+    <div class="a-title">Reset your password</div>
+    <div class="a-sub">Enter your email and we'll send a reset link.</div>
+    <div class="field"><label>Email</label><input id="fp-email" type="email" placeholder="you@company.com" autocomplete="email"/></div>
   `);
-
-  const sendBtn = document.createElement('button');
-  sendBtn.className = 'btn btn-primary';
-  sendBtn.textContent = 'Send Reset Link';
-  card.appendChild(sendBtn);
-
-  appendHTML(card, `<div class="link-row"><a id="fp-back">← Back to sign in</a></div>`);
-
-  async function doReset() {
-    const email = document.getElementById('fp-email')?.value.trim();
-    if (!email) { showToast('Please enter your email', 'warn'); return; }
-    sendBtn.disabled = true; sendBtn.textContent = 'Sending…';
-    try {
-      await window._resetPw(email);
-      showToast('✅ Reset link sent — check your email');
-      setState({ screen: 'login' });
-    } catch(e) {
-      showToast(friendlyError(e.code), 'err');
-      sendBtn.disabled = false; sendBtn.textContent = 'Send Reset Link';
-    }
+  const btn=document.createElement("button");btn.className="btn btn-primary";btn.textContent="Send Reset Link";card.appendChild(btn);
+  appendHTML(card,`<div class="link-row"><a id="fp-back">← Back to sign in</a></div>`);
+  async function doReset(){
+    const email=document.getElementById("fp-email")?.value.trim();
+    if(!email){showToast("Please enter your email","warn");return;}
+    btn.disabled=true;btn.textContent="Sending…";
+    try{await window._resetPw(email);showToast("✅ Reset link sent — check your email");setState({screen:"login"});}
+    catch(e){showToast(friendlyError(e.code),"err");btn.disabled=false;btn.textContent="Send Reset Link";}
   }
-
-  sendBtn.addEventListener('click', doReset);
-  setTimeout(() => {
-    document.getElementById('fp-email')?.addEventListener('keydown', e => { if (e.key === 'Enter') doReset(); });
-    document.getElementById('fp-back')?.addEventListener('click', () => setState({ screen: 'login' }));
-  }, 0);
-
+  btn.addEventListener("click",doReset);
+  setTimeout(()=>{
+    document.getElementById("fp-email")?.addEventListener("keydown",e=>{if(e.key==="Enter")doReset();});
+    document.getElementById("fp-back")?.addEventListener("click",()=>setState({screen:"login"}));
+  },0);
   return screen;
 }
 
-// ── SCREEN: ORG SETUP (choose path) ───────────────────────────────────────────
-function renderOrgSetup() {
-  const { screen, card } = makeScreen();
-  card.appendChild(makeLogo());
-
-  appendHTML(card, `
-    <div class="title">Set up your workspace</div>
-    <div class="sub">Create a new organization for your team, or join one you were invited to.</div>
-  `);
-
-  function makeChoiceCard(icon, title, sub, onClick) {
-    const c = document.createElement('div');
-    c.className = 'choice-card';
-    c.innerHTML = `
-      <div class="choice-icon">${icon}</div>
-      <div class="choice-title">${title}</div>
-      <div class="choice-sub">${sub}</div>
-    `;
-    c.addEventListener('click', onClick);
-    return c;
+function renderOrgSetup(){
+  const{screen,card}=makeScreen();card.appendChild(makeLogo());
+  appendHTML(card,`<div class="a-title">Set up your workspace</div><div class="a-sub">Create a new organization for your team, or join one you were invited to.</div>`);
+  function choiceCard(icon,title,sub,onClick){
+    const c=document.createElement("div");c.className="choice-card";
+    c.innerHTML=`<div class="choice-icon">${icon}</div><div class="choice-title">${title}</div><div class="choice-sub">${sub}</div>`;
+    c.addEventListener("click",onClick);return c;
   }
-
-  card.appendChild(makeChoiceCard(
-    '🏢', 'Create a new organization',
-    "You'll be the admin. Invite your team after setup.",
-    () => setState({ screen: 'create-org' })
-  ));
-
-  card.appendChild(makeChoiceCard(
-    '🔗', 'Join with an invite link',
-    'Paste the invite link your admin sent you.',
-    () => setState({ screen: 'join-org' })
-  ));
-
-  const signoutRow = document.createElement('div');
-  signoutRow.className = 'link-row';
-  signoutRow.innerHTML = `<a id="os-out">Sign out</a>`;
-  card.appendChild(signoutRow);
-
-  setTimeout(() => {
-    document.getElementById('os-out')?.addEventListener('click', () => {
-      window._signOut();
-      setState({ screen: 'login', user: null, profile: null, tenant: null });
-    });
-  }, 0);
-
+  card.appendChild(choiceCard("🏢","Create a new organization","You'll be the admin. Invite your team after setup.",()=>setState({screen:"create-org"})));
+  card.appendChild(choiceCard("🔗","Join with an invite link","Paste the invite link your admin sent you.",()=>setState({screen:"join-org"})));
+  appendHTML(card,`<div class="link-row"><a id="os-out">Sign out</a></div>`);
+  setTimeout(()=>{document.getElementById("os-out")?.addEventListener("click",()=>{window._signOut();setState({screen:"login",user:null,profile:null,tenant:null});});},0);
   return screen;
 }
 
-// ── SCREEN: CREATE ORG ─────────────────────────────────────────────────────────
-function renderCreateOrg() {
-  const { screen, card } = makeScreen();
-  card.appendChild(makeLogo());
-
-  appendHTML(card, `
-    <div class="title">Name your organization</div>
-    <div class="sub">This is what your team will see. You can change it later in settings.</div>
-    <div class="field"><label>Organization Name</label>
-      <input id="co-name" type="text" placeholder="e.g. Acme Supplies, City Hospital, Warehouse 3" />
-    </div>
+function renderCreateOrg(){
+  const{screen,card}=makeScreen();card.appendChild(makeLogo());
+  appendHTML(card,`
+    <div class="a-title">Name your organization</div>
+    <div class="a-sub">This is what your team sees. You can change it later.</div>
+    <div class="field"><label>Organization Name</label><input id="co-name" type="text" placeholder="e.g. Acme Corp, City Hospital…"/></div>
   `);
-
-  const createBtn = document.createElement('button');
-  createBtn.className = 'btn btn-primary';
-  createBtn.textContent = 'Create Organization';
-  card.appendChild(createBtn);
-
-  appendHTML(card, `<div class="link-row"><a id="co-back">← Back</a></div>`);
-
-  async function doCreate() {
-    const name = document.getElementById('co-name')?.value.trim();
-    if (!name) { showToast('Please enter an organization name', 'warn'); return; }
-    createBtn.disabled = true; createBtn.textContent = 'Creating…';
-
-    try {
-      const uid = S.user.uid;
-      const now = new Date().toISOString();
-
-      // 1. Create tenant document (Firebase auto-generates the ID)
-      const tenantId = await window._addDoc('tenants', {
-        name:      name,
-        createdBy: uid,
-        createdAt: now,
-        plan:      'free',
-      });
-
-      // 2. Update user profile with tenantId FIRST — rules need this before we
-      //    can write to tenant subcollections
-      const profile = {
-        displayName: S.profile.displayName,
-        email:       S.profile.email,
-        tenantId:    tenantId,
-        role:        'admin',
-        ownerId:     'POOL',
-        createdAt:   S.profile.createdAt,
-      };
-      await window._setDoc('users', uid, profile);
-
-      // 3. Create default "Pool" inventory location
-      await window._setDoc(`tenants/${tenantId}/owners`, 'POOL', {
-        name: 'Pool',
-        type: 'pool',
-      });
-
-      // 4. Mirror user into tenant's users subcollection (for admin panel later)
-      await window._setDoc(`tenants/${tenantId}/users`, uid, {
-        displayName: S.profile.displayName,
-        email:       S.profile.email,
-        role:        'admin',
-        ownerId:     'POOL',
-        addedAt:     now,
-      });
-
-      const tenant = { _id: tenantId, name, createdBy: uid, createdAt: now, plan: 'free' };
-      setState({ profile, tenant, screen: 'app' });
-      showToast('✅ Organization created!');
-    } catch(e) {
-      console.error(e);
-      showToast('Something went wrong: ' + e.message, 'err');
-      createBtn.disabled = false; createBtn.textContent = 'Create Organization';
-    }
+  const btn=document.createElement("button");btn.className="btn btn-primary";btn.textContent="Create Organization";card.appendChild(btn);
+  appendHTML(card,`<div class="link-row"><a id="co-back">← Back</a></div>`);
+  async function doCreate(){
+    const name=document.getElementById("co-name")?.value.trim();
+    if(!name){showToast("Please enter an organization name","warn");return;}
+    btn.disabled=true;btn.textContent="Creating…";
+    try{
+      const uid=S.user.uid;const now=new Date().toISOString();
+      const tenantId=await window._addDoc("tenants",{name,createdBy:uid,createdAt:now,plan:"free"});
+      const profile={displayName:S.profile.displayName,email:S.profile.email,tenantId,role:"admin",ownerId:"POOL",createdAt:S.profile.createdAt};
+      await window._setDoc("users",uid,profile);
+      await window._setDoc(`tenants/${tenantId}/owners`,"POOL",{name:"Pool",type:"pool"});
+      await window._setDoc(`tenants/${tenantId}/users`,uid,{displayName:S.profile.displayName,email:S.profile.email,role:"admin",ownerId:"POOL",addedAt:now});
+      const tenant={_id:tenantId,name,createdBy:uid,createdAt:now,plan:"free"};
+      setState({profile,tenant,screen:"app"});
+      showToast("✅ Organization created!");
+      loadData();
+    }catch(e){console.error(e);showToast("Something went wrong: "+e.message,"err");btn.disabled=false;btn.textContent="Create Organization";}
   }
-
-  createBtn.addEventListener('click', doCreate);
-  setTimeout(() => {
-    document.getElementById('co-name')?.addEventListener('keydown', e => { if (e.key === 'Enter') doCreate(); });
-    document.getElementById('co-back')?.addEventListener('click', () => setState({ screen: 'org-setup' }));
-  }, 0);
-
+  btn.addEventListener("click",doCreate);
+  setTimeout(()=>{
+    document.getElementById("co-name")?.addEventListener("keydown",e=>{if(e.key==="Enter")doCreate();});
+    document.getElementById("co-back")?.addEventListener("click",()=>setState({screen:"org-setup"}));
+  },0);
   return screen;
 }
 
-// ── SCREEN: JOIN ORG ───────────────────────────────────────────────────────────
-function renderJoinOrg() {
-  const { screen, card } = makeScreen();
-  card.appendChild(makeLogo());
-
-  appendHTML(card, `
-    <div class="title">Join an organization</div>
-    <div class="sub">Paste the full invite link your admin sent you.</div>
-    <div class="field"><label>Invite Link</label>
-      <input id="jo-link" type="text" placeholder="Paste invite link here…" autocomplete="off" />
-    </div>
+function renderJoinOrg(){
+  const{screen,card}=makeScreen();card.appendChild(makeLogo());
+  appendHTML(card,`
+    <div class="a-title">Join an organization</div>
+    <div class="a-sub">Paste the full invite link your admin sent you.</div>
+    <div class="field"><label>Invite Link</label><input id="jo-link" type="text" placeholder="Paste invite link here…" autocomplete="off"/></div>
   `);
-
-  // Pre-fill if we arrived via an invite URL
-  if (S.inviteCode) {
-    setTimeout(() => {
-      const input = document.getElementById('jo-link');
-      if (input) input.value = window.location.href;
-    }, 30);
+  if(S.inviteCode)setTimeout(()=>{const i=document.getElementById("jo-link");if(i)i.value=window.location.href;},30);
+  const btn=document.createElement("button");btn.className="btn btn-primary";btn.textContent="Join Organization";card.appendChild(btn);
+  appendHTML(card,`<div class="link-row"><a id="jo-back">← Back</a></div>`);
+  async function doJoin(){
+    const raw=document.getElementById("jo-link")?.value.trim();
+    if(!raw){showToast("Please paste your invite link","warn");return;}
+    let code=raw;try{const url=new URL(raw);code=url.searchParams.get("invite")||raw;}catch{}
+    btn.disabled=true;btn.textContent="Joining…";
+    try{
+      const invite=await window._getDoc("invites",code);
+      if(!invite){showToast("Invite not found","err");btn.disabled=false;btn.textContent="Join Organization";return;}
+      if(invite.usedBy){showToast("Invite already used","err");btn.disabled=false;btn.textContent="Join Organization";return;}
+      if(invite.expiresAt&&new Date(invite.expiresAt)<new Date()){showToast("Invite expired","err");btn.disabled=false;btn.textContent="Join Organization";return;}
+      const uid=S.user.uid;const now=new Date().toISOString();const{tenantId,role,ownerId}=invite;
+      const profile={displayName:S.profile.displayName,email:S.profile.email,tenantId,role:role||"member",ownerId:ownerId||"POOL",createdAt:S.profile.createdAt};
+      await window._setDoc("users",uid,profile);
+      await window._setDoc(`tenants/${tenantId}/users`,uid,{displayName:S.profile.displayName,email:S.profile.email,role:role||"member",ownerId:ownerId||"POOL",addedAt:now});
+      await window._updateDoc("invites",code,{usedBy:uid,usedAt:now});
+      const tenant=await window._getDoc("tenants",tenantId);
+      setState({profile,tenant,screen:"app"});
+      showToast("✅ Welcome to the team!");
+      loadData();
+    }catch(e){console.error(e);showToast("Something went wrong: "+e.message,"err");btn.disabled=false;btn.textContent="Join Organization";}
   }
-
-  const joinBtn = document.createElement('button');
-  joinBtn.className = 'btn btn-primary';
-  joinBtn.textContent = 'Join Organization';
-  card.appendChild(joinBtn);
-
-  appendHTML(card, `<div class="link-row"><a id="jo-back">← Back</a></div>`);
-
-  async function doJoin() {
-    const raw = document.getElementById('jo-link')?.value.trim();
-    if (!raw) { showToast('Please paste your invite link', 'warn'); return; }
-
-    // Extract invite code from URL or treat input as raw code
-    let code = raw;
-    try {
-      const url = new URL(raw);
-      code = url.searchParams.get('invite') || raw;
-    } catch { /* not a URL — use as-is */ }
-
-    joinBtn.disabled = true; joinBtn.textContent = 'Joining…';
-
-    try {
-      const invite = await window._getDoc('invites', code);
-
-      if (!invite)           { showToast('Invite not found — check the link and try again', 'err'); joinBtn.disabled = false; joinBtn.textContent = 'Join Organization'; return; }
-      if (invite.usedBy)     { showToast('This invite has already been used', 'err');               joinBtn.disabled = false; joinBtn.textContent = 'Join Organization'; return; }
-      if (invite.expiresAt && new Date(invite.expiresAt) < new Date()) {
-        showToast('This invite has expired — ask your admin for a new one', 'err');
-        joinBtn.disabled = false; joinBtn.textContent = 'Join Organization'; return;
-      }
-
-      const uid = S.user.uid;
-      const now = new Date().toISOString();
-      const { tenantId, role, ownerId } = invite;
-
-      const profile = {
-        displayName: S.profile.displayName,
-        email:       S.profile.email,
-        tenantId:    tenantId,
-        role:        role    || 'member',
-        ownerId:     ownerId || 'POOL',
-        createdAt:   S.profile.createdAt,
-      };
-
-      // Save user profile
-      await window._setDoc('users', uid, profile);
-
-      // Mirror into tenant users
-      await window._setDoc(`tenants/${tenantId}/users`, uid, {
-        displayName: S.profile.displayName,
-        email:       S.profile.email,
-        role:        role    || 'member',
-        ownerId:     ownerId || 'POOL',
-        addedAt:     now,
-      });
-
-      // Mark invite as used
-      await window._updateDoc('invites', code, { usedBy: uid, usedAt: now });
-
-      // Load tenant info
-      const tenant = await window._getDoc('tenants', tenantId);
-      setState({ profile, tenant, screen: 'app' });
-      showToast('✅ Welcome to the team!');
-    } catch(e) {
-      console.error(e);
-      showToast('Something went wrong: ' + e.message, 'err');
-      joinBtn.disabled = false; joinBtn.textContent = 'Join Organization';
-    }
-  }
-
-  joinBtn.addEventListener('click', doJoin);
-  setTimeout(() => {
-    document.getElementById('jo-back')?.addEventListener('click', () => setState({ screen: 'org-setup' }));
-    document.getElementById('jo-link')?.addEventListener('keydown', e => { if (e.key === 'Enter') doJoin(); });
-  }, 0);
-
+  btn.addEventListener("click",doJoin);
+  setTimeout(()=>{
+    document.getElementById("jo-back")?.addEventListener("click",()=>setState({screen:"org-setup"}));
+    document.getElementById("jo-link")?.addEventListener("keydown",e=>{if(e.key==="Enter")doJoin();});
+  },0);
   return screen;
 }
 
-// ── SCREEN: APP PLACEHOLDER ────────────────────────────────────────────────────
-// Replaced in Step 4 with the full inventory app
-function renderAppPlaceholder() {
-  const { screen, card } = makeScreen();
-  card.appendChild(makeLogo());
+// ── MAIN APP ──────────────────────────────────────────────────────────────────
+function renderApp(){
+  const page=document.createElement("div");page.className="page";
 
-  const ph = document.createElement('div');
-  ph.style.textAlign = 'center';
+  // Topbar
+  const topbar=document.createElement("div");topbar.className="topbar";
+  const logoWrap=makeLogo(true);
+  const rightSide=document.createElement("div");rightSide.style.cssText="display:flex;flex-direction:column;align-items:flex-end;gap:2px";
+  const orgSpan=document.createElement("div");orgSpan.className="topbar-org";orgSpan.textContent=S.tenant?.name||"";
+  const nameSpan=document.createElement("div");nameSpan.style.cssText="font-size:12px;color:var(--dim);font-weight:600";nameSpan.textContent=S.profile?.displayName||"";
+  rightSide.appendChild(orgSpan);rightSide.appendChild(nameSpan);
+  topbar.appendChild(logoWrap);topbar.appendChild(rightSide);
+  page.appendChild(topbar);
 
-  const name = S.profile?.displayName || 'there';
-  const org  = S.tenant?.name || S.profile?.tenantId || '—';
-  const role = S.profile?.role || '—';
+  // Tab content
+  const content=document.createElement("div");content.className="content";
+  if(S.tab==="dashboard")renderDashboard(content);
+  else if(S.tab==="inventory")renderInventory(content);
+  else if(S.tab==="scan")renderScanMenu(content);
+  else if(S.tab==="orders")renderOrders(content);
+  else if(S.tab==="settings")renderSettings(content);
+  page.appendChild(content);
 
-  const checkDiv = document.createElement('div');
-  checkDiv.className = 'big-check';
-  checkDiv.textContent = '✅';
-  ph.appendChild(checkDiv);
+  // Modals
+  if(S.modal)page.appendChild(renderModal());
 
-  const pillDiv = document.createElement('div');
-  pillDiv.className = 'pill';
-  pillDiv.textContent = 'Step 2 Complete';
-  ph.appendChild(pillDiv);
+  // Bottom tabbar
+  const tabbar=document.createElement("div");tabbar.className="tabbar";
+  [
+    {id:"dashboard",icon:"📊",label:"Dashboard"},
+    {id:"inventory",icon:"📦",label:"Inventory"},
+    {id:"scan",icon:"📷",label:"Scan"},
+    {id:"orders",icon:"🚚",label:"Orders"},
+    {id:"settings",icon:"⚙️",label:"Settings"},
+  ].forEach(t=>{
+    const btn=document.createElement("button");
+    btn.className="tab-btn"+(S.tab===t.id?" active":"");
+    btn.innerHTML=`<span class="tab-icon">${t.icon}</span>${t.label}`;
+    btn.onclick=()=>setState({tab:t.id,modal:null});
+    tabbar.appendChild(btn);
+  });
+  page.appendChild(tabbar);
+  return page;
+}
 
-  const titleDiv = document.createElement('div');
-  titleDiv.className = 'title';
-  titleDiv.style.marginBottom = '6px';
-  titleDiv.textContent = `You're in, ${name}!`;
-  ph.appendChild(titleDiv);
+// ── DASHBOARD ─────────────────────────────────────────────────────────────────
+function renderDashboard(content){
+  const{items,owners,log,orders,profile}=S;
+  const myItems=profile.role==="admin"?items:items.filter(i=>i.ownerId===profile.ownerId);
+  const active=myItems.filter(i=>i.status==="active").length;
+  const used=myItems.filter(i=>i.status==="used").length;
+  const transit=myItems.filter(i=>i.status==="transit").length;
+  const pending=orders.filter(o=>o.status==="pending").length;
 
-  const subDiv = document.createElement('div');
-  subDiv.className = 'sub';
-  subDiv.style.marginBottom = '20px';
-  subDiv.textContent = 'Auth and organization setup is working. The main app arrives in Step 4.';
-  ph.appendChild(subDiv);
+  // Expiry alerts
+  const now=new Date();const soon=new Date();soon.setDate(soon.getDate()+120);
+  const expiring=myItems.filter(i=>i.expDate&&i.status==="active"&&new Date(i.expDate)<=soon&&new Date(i.expDate)>=now);
+  const expired=myItems.filter(i=>i.expDate&&new Date(i.expDate)<now&&i.status==="active");
 
-  // Show org info
-  const rows = [
-    ['Organization', org],
-    ['Your Role',    role],
-    ['Email',        S.profile?.email || '—'],
+  const hdr=document.createElement("div");hdr.style.cssText="margin-bottom:16px;padding-top:4px";
+  hdr.innerHTML=`<div style="font-size:20px;font-weight:800;color:var(--text)">Dashboard</div><div style="font-size:13px;color:var(--muted)">Good to see you, ${profile.displayName?.split(" ")[0]||"there"}</div>`;
+  content.appendChild(hdr);
+
+  if(expired.length>0){
+    const banner=document.createElement("div");banner.className="expiry-banner";
+    banner.innerHTML=`<span style="font-size:20px">⚠️</span><span class="expiry-banner-text">${expired.length} item${expired.length>1?"s":""} expired</span>`;
+    banner.onclick=()=>setState({tab:"inventory",inventorySearch:"__expired__"});
+    content.appendChild(banner);
+  }
+  if(expiring.length>0){
+    const banner=document.createElement("div");banner.className="expiry-banner";banner.style.cssText="background:rgba(245,158,11,.12);border-color:rgba(245,158,11,.3);";
+    banner.innerHTML=`<span style="font-size:20px">⏰</span><span style="font-size:13px;font-weight:600;color:var(--amber)">${expiring.length} item${expiring.length>1?"s":""} expiring within 120 days</span>`;
+    content.appendChild(banner);
+  }
+
+  // Stats
+  const grid=document.createElement("div");grid.className="stat-grid";
+  [[active,"#22c55e","Active"],[used,"#f59e0b","Checked Out"],[transit,"#8b5cf6","In Transit"],[pending,"#0ea5e9","Orders"]].forEach(([num,color,label])=>{
+    const c=document.createElement("div");c.className="stat-card";
+    c.innerHTML=`<div class="stat-num" style="color:${color}">${num}</div><div class="stat-label">${label}</div>`;
+    grid.appendChild(c);
+  });
+  content.appendChild(grid);
+
+  // Quick actions
+  const actHdr=document.createElement("div");actHdr.style.cssText="font-size:11px;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.06em;margin:16px 0 8px";actHdr.textContent="Quick Actions";content.appendChild(actHdr);
+  const actGrid=document.createElement("div");actGrid.className="action-grid";
+  const actions=[
+    {icon:"📥",label:"Check In",  fn:()=>setState({tab:"scan",modal:null,scanMode:"checkin",scanning:true,scanHint:"Scan to check in"})},
+    {icon:"📤",label:"Check Out", fn:()=>setState({tab:"scan",modal:null,scanMode:"checkout",scanning:true,scanHint:"Scan to check out"})},
+    {icon:"🔄",label:"Transfer",  fn:()=>setState({tab:"scan",modal:null,scanMode:"transfer",scanning:true,scanHint:"Scan to transfer"})},
+    {icon:"📦",label:"Multi-Scan",fn:()=>setState({multiMode:true,showMultiDetails:true})},
+    {icon:"🚚",label:"New Order", fn:()=>setState({tab:"orders",showOrderItemScan:true,scanning:true,scanHint:"Scan items for order",orderItems:[]})},
+    {icon:"📋",label:"Inventory", fn:()=>setState({tab:"inventory"})},
   ];
-  rows.forEach(([label, val]) => {
-    const row = document.createElement('div');
-    row.className = 'info-row';
-    row.innerHTML = `<span>${label}</span><strong>${val}</strong>`;
-    ph.appendChild(row);
+  actions.forEach(a=>{
+    const btn=document.createElement("div");btn.className="action-btn";
+    btn.innerHTML=`<span class="ab-icon">${a.icon}</span><span class="ab-label">${a.label}</span>`;
+    btn.onclick=a.fn;actGrid.appendChild(btn);
   });
+  content.appendChild(actGrid);
 
-  const signoutBtn = document.createElement('button');
-  signoutBtn.className = 'btn btn-ghost';
-  signoutBtn.textContent = 'Sign Out';
-  signoutBtn.style.marginTop = '24px';
-  signoutBtn.addEventListener('click', () => {
-    window._signOut();
-    setState({ screen: 'login', user: null, profile: null, tenant: null });
-  });
-  ph.appendChild(signoutBtn);
-
-  card.appendChild(ph);
-  return screen;
+  // Recent activity
+  if(log.length>0){
+    const logHdr=document.createElement("div");logHdr.style.cssText="font-size:11px;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.06em;margin:16px 0 8px";logHdr.textContent="Recent Activity";content.appendChild(logHdr);
+    const actionColors={CHECK_IN:"#22c55e",CHECK_OUT:"#f59e0b",TRANSFER:"#6366f1",ORDER_IN:"#0ea5e9",ORDER_OUT:"#a855f7",UNDO_CHECKOUT:"#94a3b8"};
+    const actionIcons={CHECK_IN:"📥",CHECK_OUT:"📤",TRANSFER:"🔄",ORDER_IN:"📦",ORDER_OUT:"🚚",UNDO_CHECKOUT:"↩️"};
+    log.slice(0,8).forEach(entry=>{
+      const row=document.createElement("div");row.className="log-row";
+      const icon=document.createElement("span");icon.style.cssText="font-size:18px;margin-top:2px";icon.textContent=actionIcons[entry.action]||"📋";
+      const info=document.createElement("div");info.style.flex="1";
+      const color=actionColors[entry.action]||"#94a3b8";
+      let detail="";
+      if(entry.from&&entry.to)detail=entry.from+" → "+entry.to;
+      else if(entry.to)detail="→ "+entry.to;
+      info.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center"><span style="color:${color};font-weight:700;font-size:12px">${(entry.action||"").replace(/_/g," ")}</span><span style="color:var(--muted);font-size:10px">${formatDate(entry.ts)}</span></div><div style="color:var(--text);font-size:13px;font-weight:600;margin-top:2px">${entry.itemName||entry.barcode}</div>${detail?`<div style="color:var(--dim);font-size:12px;margin-top:1px">${detail}</div>`:""}<div style="color:var(--muted);font-size:11px;margin-top:1px">by ${entry.user}</div>`;
+      row.appendChild(icon);row.appendChild(info);content.appendChild(row);
+    });
+  }
 }
 
-// ── AUTH ERROR → FRIENDLY MESSAGE ─────────────────────────────────────────────
-function friendlyError(code) {
-  const map = {
-    'auth/invalid-email':          'Please enter a valid email address.',
-    'auth/user-not-found':         'No account found with that email.',
-    'auth/wrong-password':         'Incorrect password.',
-    'auth/invalid-credential':     'Incorrect email or password.',
-    'auth/email-already-in-use':   'An account with that email already exists.',
-    'auth/weak-password':          'Password must be at least 6 characters.',
-    'auth/too-many-requests':      'Too many attempts. Please wait and try again.',
-    'auth/network-request-failed': 'Network error. Check your connection.',
+// ── INVENTORY ─────────────────────────────────────────────────────────────────
+function renderInventory(content){
+  const{items,owners,profile}=S;
+  const hdr=document.createElement("div");hdr.style.cssText="margin-bottom:12px;padding-top:4px";hdr.innerHTML=`<div style="font-size:20px;font-weight:800">Inventory</div>`;content.appendChild(hdr);
+
+  // Owner filter (admin sees all, member sees their own)
+  if(profile.role==="admin"&&owners.length>1){
+    const sel=document.createElement("select");sel.className="mb8";sel.style.marginBottom="12px";
+    sel.innerHTML=`<option value="">All locations</option>`+owners.map(o=>`<option value="${o.id}"${S.selectedOwner===o.id?" selected":""}>${o.name}</option>`).join("");
+    sel.onchange=()=>setState({selectedOwner:sel.value});
+    content.appendChild(sel);
+  }
+
+  // Search
+  const sw=document.createElement("div");sw.className="search-wrap";
+  sw.innerHTML=`<span class="search-icon">🔍</span><input id="inv-search" type="text" placeholder="Search items or barcodes…" value="${S.inventorySearch==="__expired__"?"":S.inventorySearch}"/>`;
+  sw.querySelector("input").oninput=e=>setState({inventorySearch:e.target.value});
+  content.appendChild(sw);
+
+  // Filter items
+  let filtered=items;
+  if(profile.role!=="admin")filtered=filtered.filter(i=>i.ownerId===profile.ownerId);
+  if(S.selectedOwner)filtered=filtered.filter(i=>i.ownerId===S.selectedOwner);
+  if(S.inventorySearch==="__expired__"){
+    filtered=filtered.filter(i=>i.expDate&&new Date(i.expDate)<new Date()&&i.status==="active");
+  }else if(S.inventorySearch){
+    const q=S.inventorySearch.toLowerCase();
+    filtered=filtered.filter(i=>(i.name||"").toLowerCase().includes(q)||(i.barcode||"").toLowerCase().includes(q)||(i.type||"").toLowerCase().includes(q));
+  }
+
+  // Count row
+  const countRow=document.createElement("div");countRow.style.cssText="font-size:12px;color:var(--muted);margin-bottom:8px";
+  countRow.textContent=`${filtered.length} item${filtered.length!==1?"s":""}`;content.appendChild(countRow);
+
+  if(filtered.length===0){
+    const empty=document.createElement("div");empty.style.cssText="text-align:center;padding:40px 0;color:var(--muted);font-size:14px";
+    empty.innerHTML=`<div style="font-size:40px;margin-bottom:12px">📦</div>${S.inventorySearch?"No items match your search":"No items yet — check some in!"}`;
+    content.appendChild(empty);return;
+  }
+
+  filtered.forEach(item=>{
+    const row=document.createElement("div");row.className="item-row";
+    const ownerName=owners.find(o=>o.id===item.ownerId)?.name||item.ownerId;
+    const statusClass={active:"status-active",used:"status-used",transit:"status-transit"}[item.status]||"status-active";
+    const isExpired=item.expDate&&new Date(item.expDate)<new Date()&&item.status==="active";
+    row.innerHTML=`
+      <div style="flex:1;min-width:0">
+        <div class="item-name">${item.name}${isExpired?` <span style="font-size:10px;color:var(--red);font-weight:700">EXPIRED</span>`:""}</div>
+        <div class="item-meta">${ownerName}${item.type?` · ${item.type}`:""}${item.expDate?` · exp ${item.expDate.substring(0,10)}`:""}${item.usedBy?` · used by ${item.usedBy}`:""}</div>
+        <div style="font-size:10px;color:var(--muted);font-family:monospace;margin-top:2px">${item.barcode}</div>
+      </div>
+      <span class="status-badge ${statusClass}">${item.status}</span>
+    `;
+    row.onclick=()=>setState({modal:{type:"item_detail",item}});
+    content.appendChild(row);
+  });
+}
+
+// ── SCAN MENU ─────────────────────────────────────────────────────────────────
+function renderScanMenu(content){
+  const hdr=document.createElement("div");hdr.style.cssText="margin-bottom:16px;padding-top:4px";hdr.innerHTML=`<div style="font-size:20px;font-weight:800">Scan</div><div style="font-size:13px;color:var(--muted)">Choose an action then point your camera at a QR code</div>`;content.appendChild(hdr);
+  const actions=[
+    {icon:"📥",label:"Check In",  sub:"Scan to add item to inventory",   fn:()=>setState({scanMode:"checkin",scanning:true,scanHint:"Scan to check in"})},
+    {icon:"📤",label:"Check Out", sub:"Scan to mark item as used",        fn:()=>setState({scanMode:"checkout",scanning:true,scanHint:"Scan to check out"})},
+    {icon:"🔄",label:"Transfer",  sub:"Scan to move item to new location",fn:()=>setState({scanMode:"transfer",scanning:true,scanHint:"Scan item or order QR"})},
+    {icon:"📦",label:"Multi-Scan",sub:"Check in multiple items at once",  fn:()=>setState({multiMode:true,showMultiDetails:true})},
+  ];
+  actions.forEach(a=>{
+    const c=document.createElement("div");c.className="choice-card";
+    c.innerHTML=`<div style="display:flex;align-items:center;gap:14px"><div style="font-size:28px">${a.icon}</div><div><div class="choice-title">${a.label}</div><div class="choice-sub">${a.sub}</div></div></div>`;
+    c.onclick=a.fn;content.appendChild(c);
+  });
+}
+
+// ── ORDERS ────────────────────────────────────────────────────────────────────
+function renderOrders(content){
+  const{orders,profile}=S;
+  const hdr=document.createElement("div");hdr.style.cssText="margin-bottom:12px;padding-top:4px;display:flex;justify-content:space-between;align-items:center";
+  hdr.innerHTML=`<div style="font-size:20px;font-weight:800">Orders</div>`;
+  if(profile.role==="admin"){
+    const newBtn=document.createElement("button");newBtn.style.cssText="background:var(--primary);color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:700;cursor:pointer";
+    newBtn.textContent="+ New Order";
+    newBtn.onclick=()=>setState({showOrderItemScan:true,scanning:true,scanHint:"Scan items for order",orderItems:[]});
+    hdr.appendChild(newBtn);
+  }
+  content.appendChild(hdr);
+
+  if(orders.length===0){
+    const empty=document.createElement("div");empty.style.cssText="text-align:center;padding:40px 0;color:var(--muted);font-size:14px";
+    empty.innerHTML=`<div style="font-size:40px;margin-bottom:12px">🚚</div>No orders yet`;
+    content.appendChild(empty);return;
+  }
+
+  orders.slice().sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt)).forEach(order=>{
+    const c=document.createElement("div");c.className="card";c.style.cursor="pointer";
+    const isPending=order.status==="pending";
+    c.innerHTML=`
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
+        <div style="font-weight:700;font-size:15px">${order.name}</div>
+        <span class="status-badge ${isPending?"status-transit":"status-active"}">${order.status}</span>
+      </div>
+      <div style="font-size:12px;color:var(--muted)">${order.count} item${order.count!==1?"s":""} · by ${order.createdBy} · ${formatDate(order.createdAt)}</div>
+      ${isPending?`<div style="font-size:12px;color:var(--purple);font-weight:600;margin-top:8px">→ Scan QR to receive</div>`:""}
+    `;
+    c.onclick=()=>{
+      if(isPending)setState({scanMode:"transfer",scanning:true,scanHint:"Scan the order QR to receive"});
+    };
+    content.appendChild(c);
+  });
+}
+
+// ── SETTINGS ──────────────────────────────────────────────────────────────────
+function renderSettings(content){
+  const{profile,tenant}=S;
+  const hdr=document.createElement("div");hdr.style.cssText="margin-bottom:16px;padding-top:4px";hdr.innerHTML=`<div style="font-size:20px;font-weight:800">Settings</div>`;content.appendChild(hdr);
+
+  // Profile
+  appendSection(content,"Account");
+  infoRow(content,"Name",profile.displayName);
+  infoRow(content,"Email",profile.email);
+  infoRow(content,"Role",profile.role==="admin"?"Admin":"Member");
+
+  // Org
+  appendSection(content,"Organization");
+  infoRow(content,"Name",tenant?.name||"—");
+  infoRow(content,"Plan",tenant?.plan||"free");
+
+  if(profile.role==="admin"){
+    // Manage users
+    const uBtn=settingsBtn("👥 Manage Team","Add, remove, or reassign team members",()=>setState({modal:{type:"manage_users"}}));
+    content.appendChild(uBtn);
+    // Add owner/location
+    const oBtn=settingsBtn("📍 Manage Locations","Add or rename inventory locations",()=>setState({modal:{type:"manage_owners"}}));
+    content.appendChild(oBtn);
+    // Invite
+    const iBtn=settingsBtn("✉️ Invite Team Member","Generate an invite link to share",()=>setState({modal:{type:"invite"}}));
+    content.appendChild(iBtn);
+  }
+
+  appendSection(content,"App");
+  infoRow(content,"Timezone","Device local time");
+  infoRow(content,"Version","Traxify v1.0");
+
+  // Sign out
+  const soBtn=document.createElement("button");soBtn.className="btn btn-ghost";soBtn.style.marginTop="20px";soBtn.textContent="Sign Out";
+  soBtn.onclick=()=>{window._signOut();setState({screen:"login",user:null,profile:null,tenant:null,owners:[],items:[],log:[],orders:[],tenantUsers:[]});};
+  content.appendChild(soBtn);
+}
+
+function appendSection(parent,title){
+  const d=document.createElement("div");d.style.cssText="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin:16px 0 6px";d.textContent=title;parent.appendChild(d);
+}
+function infoRow(parent,label,value){
+  const r=document.createElement("div");r.className="settings-row";r.style.cursor="default";
+  r.innerHTML=`<span class="settings-label">${label}</span><span class="settings-value">${value}</span>`;parent.appendChild(r);
+}
+function settingsBtn(label,sub,onClick){
+  const r=document.createElement("div");r.className="settings-row";
+  r.innerHTML=`<div><div class="settings-label">${label}</div><div class="settings-value" style="margin-top:2px">${sub}</div></div><span style="color:var(--muted)">›</span>`;
+  r.onclick=onClick;return r;
+}
+
+// ── SCAN PAGE ─────────────────────────────────────────────────────────────────
+function renderScanPage(){
+  stopScanner();
+  const app=document.getElementById("app");app.innerHTML="";
+  const page=document.createElement("div");page.className="scan-page";
+
+  const hint=document.createElement("div");hint.className="scan-hint";
+  if(S.showOrderItemScan)hint.textContent=`${S.orderItems.length} item${S.orderItems.length!==1?"s":""} scanned for order`;
+  else if(S.showOrderQRScan)hint.textContent="Now scan the ORDER QR code";
+  else if(S.showMultiScan)hint.textContent=`${S.multiCodes.length} code${S.multiCodes.length!==1?"s":""} scanned`;
+  else hint.textContent=S.scanHint||"Point camera at QR code";
+  page.appendChild(hint);
+
+  const video=document.createElement("video");video.id="scan-video";video.className="scan-video";video.setAttribute("playsinline","");video.setAttribute("muted","");page.appendChild(video);
+  const canvas=document.createElement("canvas");canvas.id="scan-canvas";canvas.className="scan-canvas";page.appendChild(canvas);
+  const status=document.createElement("div");status.id="scan-status";status.className="scan-status";page.appendChild(status);
+
+  // Manual input
+  const mw=document.createElement("div");mw.className="scan-manual";
+  const mi=document.createElement("input");mi.type="text";mi.placeholder="Or type code manually…";
+  mi.onkeydown=e=>{if(e.key==="Enter"&&mi.value.trim()){handleScan(mi.value.trim());mi.value="";}};
+  mw.appendChild(mi);page.appendChild(mw);
+
+  // Close button
+  const closeBtn=document.createElement("button");closeBtn.className="scan-close";closeBtn.textContent="✕";
+  closeBtn.onclick=()=>{
+    stopScanner();
+    setState({
+      scanning:false,scanMode:null,showOrderItemScan:false,showOrderQRScan:false,
+      showMultiScan:false,activeOrder:null
+    });
   };
-  return map[code] || 'Something went wrong. Please try again.';
+  page.appendChild(closeBtn);
+
+  // Order item scan — done button
+  if(S.showOrderItemScan&&S.orderItems.length>0){
+    const doneBtn=document.createElement("button");
+    doneBtn.style.cssText="position:absolute;bottom:80px;left:50%;transform:translateX(-50%);background:var(--primary);color:#fff;border:none;border-radius:10px;padding:12px 32px;font-size:15px;font-weight:700;cursor:pointer;white-space:nowrap";
+    doneBtn.textContent=`Done — ${S.orderItems.length} item${S.orderItems.length!==1?"s":""} →`;
+    doneBtn.onclick=()=>{stopScanner();setState({showOrderItemScan:false,scanning:false,showOrderQRScan:true,scanning:true,scanHint:"Scan the ORDER QR code"});};
+    page.appendChild(doneBtn);
+  }
+
+  // Multi-scan done button
+  if(S.showMultiScan&&S.multiCodes.length>0){
+    const doneBtn=document.createElement("button");
+    doneBtn.style.cssText="position:absolute;bottom:80px;left:50%;transform:translateX(-50%);background:var(--primary);color:#fff;border:none;border-radius:10px;padding:12px 32px;font-size:15px;font-weight:700;cursor:pointer;white-space:nowrap";
+    doneBtn.textContent=`Done — ${S.multiCodes.length} code${S.multiCodes.length!==1?"s":""} →`;
+    doneBtn.onclick=()=>{stopScanner();setState({showMultiScan:false,scanning:false,showMultiConfirm:true});};
+    page.appendChild(doneBtn);
+  }
+
+  app.appendChild(page);
+  setTimeout(startScanner,100);
 }
 
-// ── INIT ───────────────────────────────────────────────────────────────────────
-async function init() {
-  render(); // show loading spinner right away
+// ── MULTI-SCAN SCREENS ────────────────────────────────────────────────────────
+function renderMultiDetails(){
+  const app=document.getElementById("app");app.innerHTML="";
+  const page=document.createElement("div");page.className="full-page";
+  const inner=document.createElement("div");inner.className="full-inner";
 
-  // Check URL for ?invite= param
-  const params     = new URLSearchParams(window.location.search);
-  const inviteCode = params.get('invite');
-  if (inviteCode) S.inviteCode = inviteCode;
+  inner.innerHTML=`<div style="font-size:20px;font-weight:800;margin-bottom:4px">Multi-Scan Check-In</div><div style="font-size:13px;color:var(--muted);margin-bottom:20px">Step 1 of 3 — Enter item details</div>`;
+
+  let name="",type="",expDate="";
+  const fields=[
+    {id:"md-name",label:"Item Name",type:"text",placeholder:"e.g. N95 Mask, Gloves, Cable",onInput:v=>{name=v;}},
+    {id:"md-type",label:"Category / Type",type:"text",placeholder:"e.g. PPE, Equipment, Supply",onInput:v=>{type=v;}},
+    {id:"md-exp",label:"Expiry Date (optional)",type:"date",placeholder:"",onInput:v=>{expDate=v;}},
+  ];
+  fields.forEach(f=>{
+    const div=document.createElement("div");div.className="field";
+    div.innerHTML=`<label>${f.label}</label><input id="${f.id}" type="${f.type}" placeholder="${f.placeholder}"/>`;
+    div.querySelector("input").oninput=e=>f.onInput(e.target.value);
+    inner.appendChild(div);
+  });
+
+  const nextBtn=document.createElement("button");nextBtn.className="btn btn-primary";nextBtn.textContent="Next — Scan Codes →";
+  nextBtn.onclick=()=>{
+    name=document.getElementById("md-name")?.value.trim();
+    type=document.getElementById("md-type")?.value.trim();
+    expDate=document.getElementById("md-exp")?.value;
+    if(!name){showToast("Please enter an item name","warn");return;}
+    setState({multiDetails:{name,type,expDate},showMultiDetails:false,showMultiScan:true,scanning:true,multiCodes:[]});
+  };
+  inner.appendChild(nextBtn);
+
+  const cancelBtn=document.createElement("button");cancelBtn.className="btn btn-ghost";cancelBtn.textContent="Cancel";
+  cancelBtn.onclick=()=>setState({multiMode:false,showMultiDetails:false,multiDetails:null});
+  inner.appendChild(cancelBtn);
+
+  page.appendChild(inner);app.appendChild(page);
+}
+
+function renderMultiConfirm(){
+  const app=document.getElementById("app");app.innerHTML="";
+  const page=document.createElement("div");page.className="full-page";
+  const inner=document.createElement("div");inner.className="full-inner";
+  const{multiDetails,multiCodes}=S;
+
+  inner.innerHTML=`<div style="font-size:20px;font-weight:800;margin-bottom:4px">Confirm Multi-Scan</div><div style="font-size:13px;color:var(--muted);margin-bottom:20px">Step 3 of 3 — Review and confirm</div>`;
+
+  const summary=document.createElement("div");summary.className="card";summary.style.marginBottom="16px";
+  summary.innerHTML=`
+    <div style="font-size:16px;font-weight:700;margin-bottom:4px">${multiDetails.name}</div>
+    <div style="font-size:13px;color:var(--muted)">${multiDetails.type||"No category"} · ${multiDetails.expDate?`Exp ${multiDetails.expDate}`:"No expiry"}</div>
+    <div style="font-size:24px;font-weight:800;color:var(--primary);margin-top:10px">${multiCodes.length} items</div>
+  `;
+  inner.appendChild(summary);
+
+  const scrollBox=document.createElement("div");scrollBox.style.cssText="max-height:200px;overflow-y:auto;margin-bottom:16px";
+  multiCodes.forEach((code,i)=>{
+    const r=document.createElement("div");r.style.cssText="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 12px;margin-bottom:4px;font-size:12px;font-family:monospace;color:var(--dim);display:flex;justify-content:space-between";
+    r.innerHTML=`<span>${code}</span><span style="color:var(--muted)">#${i+1}</span>`;
+    scrollBox.appendChild(r);
+  });
+  inner.appendChild(scrollBox);
+
+  const confirmBtn=document.createElement("button");confirmBtn.className="btn btn-green";confirmBtn.textContent=`✓ Check In ${multiCodes.length} Items`;
+  confirmBtn.onclick=submitMultiCheckin;inner.appendChild(confirmBtn);
+  const backBtn=document.createElement("button");backBtn.className="btn btn-ghost";backBtn.textContent="← Re-scan";
+  backBtn.onclick=()=>setState({showMultiConfirm:false,showMultiScan:true,scanning:true});
+  inner.appendChild(backBtn);
+  const cancelBtn=document.createElement("button");cancelBtn.className="btn btn-ghost";cancelBtn.textContent="Cancel";
+  cancelBtn.onclick=()=>setState({multiMode:false,showMultiConfirm:false,multiDetails:null,multiCodes:[]});
+  inner.appendChild(cancelBtn);
+
+  page.appendChild(inner);app.appendChild(page);
+}
+
+// ── ORDER SUMMARY ─────────────────────────────────────────────────────────────
+function renderOrderSummary(){
+  const app=document.getElementById("app");app.innerHTML="";
+  const page=document.createElement("div");page.className="full-page";
+  const inner=document.createElement("div");inner.className="full-inner";
+  const{orderItems,pendingOrderQR,items,owners}=S;
+
+  const hdr=document.createElement("div");hdr.style.cssText="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px";
+  hdr.innerHTML=`<div style="font-size:20px;font-weight:800">Confirm Order</div>`;
+  const xBtn=document.createElement("button");xBtn.style.cssText="background:var(--surface2);border:1px solid var(--border);color:var(--dim);font-size:15px;border-radius:8px;padding:8px 12px;cursor:pointer;font-family:inherit";
+  xBtn.textContent="✕ Cancel";xBtn.onclick=()=>setState({showOrderSummary:false,orderItems:[],pendingOrderQR:null});
+  hdr.appendChild(xBtn);inner.appendChild(hdr);
+
+  // Order name
+  inner.innerHTML+=`<div class="field"><label>Order Name</label><input id="order-name" type="text" placeholder="e.g. Shipment to Site A, June Restock…"/></div>`;
+
+  // QR preview
+  const qrCard=document.createElement("div");qrCard.className="card mb16";
+  qrCard.innerHTML=`<div class="label">Order QR Code</div><div id="order-qr" style="background:#fff;padding:8px;border-radius:8px;display:inline-block;margin-top:4px"></div><div style="font-size:11px;color:var(--muted);margin-top:6px;font-family:monospace">${pendingOrderQR}</div>`;
+  inner.appendChild(qrCard);
+  setTimeout(()=>{
+    const qrEl=document.getElementById("order-qr");
+    if(qrEl&&window.QRCode)new window.QRCode(qrEl,{text:pendingOrderQR,width:100,height:100});
+  },50);
+
+  // Items list
+  const itemsCard=document.createElement("div");itemsCard.className="card mb16";
+  const poolOwner=owners.find(o=>o.id.toUpperCase()==="POOL")||owners[0];
+  itemsCard.innerHTML=`<div class="label">${orderItems.length} Item${orderItems.length!==1?"s":""}</div>`;
+  orderItems.forEach(barcode=>{
+    const item=items.find(i=>i.barcode===barcode);
+    const r=document.createElement("div");r.style.cssText="font-size:13px;color:var(--dim);padding:4px 0;border-bottom:1px solid var(--border)";
+    r.textContent=item?item.name:barcode;itemsCard.appendChild(r);
+  });
+  inner.appendChild(itemsCard);
+
+  const confirmBtn=document.createElement("button");confirmBtn.className="btn btn-primary";confirmBtn.textContent="🚚 Create Order";
+  confirmBtn.onclick=()=>{
+    const name=document.getElementById("order-name")?.value.trim();
+    if(!name){showToast("Please enter an order name","warn");return;}
+    submitCreateOrder(name,orderItems,pendingOrderQR);
+  };
+  inner.appendChild(confirmBtn);
+
+  const printBtn=document.createElement("button");printBtn.className="btn btn-ghost";printBtn.textContent="🖨️ Print QR Label";
+  printBtn.onclick=()=>{
+    const pa=document.getElementById("print-area");
+    pa.innerHTML=`<h2>Order QR</h2><div id="print-qr" style="margin:16px auto;display:inline-block;background:#fff;padding:8px"></div><p style="font-family:monospace;font-size:12px">${pendingOrderQR}</p>`;
+    if(window.QRCode)new window.QRCode(document.getElementById("print-qr"),{text:pendingOrderQR,width:180,height:180});
+    setTimeout(()=>window.print(),200);
+  };
+  inner.appendChild(printBtn);
+
+  page.appendChild(inner);app.appendChild(page);
+}
+
+// ── MODALS ────────────────────────────────────────────────────────────────────
+function renderModal(){
+  const{modal,owners,profile}=S;
+  if(!modal)return null;
+
+  function overlay(inner,center){
+    const div=document.createElement("div");div.className=center?"overlay-center":"overlay";
+    div.onclick=e=>{if(e.target===div)setState({modal:null});};
+    div.appendChild(inner);return div;
+  }
+  function modalInner(){const d=document.createElement("div");d.className="overlay-inner";return d;}
+
+  // ── Check In ──
+  if(modal.type==="checkin"){
+    const inner=modalInner();
+    inner.innerHTML=`<div class="modal-title">Check In Item</div><div class="modal-sub">Barcode: <span style="font-family:monospace;color:var(--primary)">${modal.barcode}</span></div>`;
+    let name="",type="",expDate="",ownerId=profile.role==="admin"?"":profile.ownerId;
+    const fields=[
+      {id:"ci-name",label:"Item Name",type:"text",placeholder:"e.g. N95 Mask",onInput:v=>{name=v;}},
+      {id:"ci-type",label:"Category",type:"text",placeholder:"e.g. PPE, Equipment",onInput:v=>{type=v;}},
+      {id:"ci-exp",label:"Expiry Date (optional)",type:"date",onInput:v=>{expDate=v;}},
+    ];
+    fields.forEach(f=>{
+      const div=document.createElement("div");div.className="field";
+      div.innerHTML=`<label>${f.label}</label><input id="${f.id}" type="${f.type}" placeholder="${f.placeholder||""}"/>`;
+      div.querySelector("input").oninput=e=>f.onInput(e.target.value);inner.appendChild(div);
+    });
+    if(profile.role==="admin"){
+      const sel=document.createElement("div");sel.className="field";
+      sel.innerHTML=`<label>Location</label><select id="ci-owner">${owners.map(o=>`<option value="${o.id}">${o.name}</option>`).join("")}</select>`;
+      sel.querySelector("select").onchange=e=>{ownerId=e.target.value;};inner.appendChild(sel);
+    }
+    const btn=document.createElement("button");btn.className="btn btn-green";btn.textContent="✓ Check In";
+    btn.onclick=()=>{
+      name=document.getElementById("ci-name")?.value.trim();
+      type=document.getElementById("ci-type")?.value.trim();
+      expDate=document.getElementById("ci-exp")?.value;
+      if(profile.role==="admin")ownerId=document.getElementById("ci-owner")?.value;
+      if(!name){showToast("Please enter an item name","warn");return;}
+      if(!ownerId){showToast("Please select a location","warn");return;}
+      submitCheckin(modal.barcode,name,type,expDate,ownerId);
+      setState({modal:null,scanning:S.activeOrder?true:false});
+    };
+    inner.appendChild(btn);
+    const cancel=document.createElement("button");cancel.className="btn btn-ghost";cancel.textContent="Cancel";cancel.onclick=()=>setState({modal:null,scanning:S.scanMode?true:false});inner.appendChild(cancel);
+    return overlay(inner);
+  }
+
+  // ── Check Out ──
+  if(modal.type==="checkout"){
+    const{item}=modal;const inner=modalInner();
+    const ownerName=owners.find(o=>o.id===item.ownerId)?.name||item.ownerId;
+    inner.innerHTML=`<div class="modal-title">Check Out</div><div class="modal-sub">${item.name} · ${ownerName}</div>`;
+    const field=document.createElement("div");field.className="field";
+    field.innerHTML=`<label>Used By / Reason</label><input id="co-user" type="text" placeholder="Who is using this item?"/>`;inner.appendChild(field);
+    const btn=document.createElement("button");btn.className="btn btn-amber";btn.textContent="📤 Check Out";
+    btn.onclick=()=>{
+      const usedBy=document.getElementById("co-user")?.value.trim();
+      if(!usedBy){showToast("Please enter who is using this","warn");return;}
+      submitCheckout(item,usedBy);setState({modal:null,scanning:S.scanMode?true:false});
+    };inner.appendChild(btn);
+    const cancel=document.createElement("button");cancel.className="btn btn-ghost";cancel.textContent="Cancel";cancel.onclick=()=>setState({modal:null,scanning:S.scanMode?true:false});inner.appendChild(cancel);
+    return overlay(inner);
+  }
+
+  // ── Transfer ──
+  if(modal.type==="transfer"){
+    const{item}=modal;const inner=modalInner();
+    const fromName=owners.find(o=>o.id===item.ownerId)?.name||item.ownerId;
+    inner.innerHTML=`<div class="modal-title">Transfer Item</div><div class="modal-sub">${item.name} · from ${fromName}</div>`;
+    const availOwners=profile.role==="admin"?owners.filter(o=>o.id!==item.ownerId):owners.filter(o=>o.id===profile.ownerId&&o.id!==item.ownerId);
+    if(availOwners.length===0){inner.innerHTML+=`<div style="color:var(--muted);font-size:14px;text-align:center;padding:20px 0">No other locations available</div>`;}
+    else{
+      const sel=document.createElement("div");sel.className="field";
+      sel.innerHTML=`<label>Transfer To</label><select id="tr-owner">${availOwners.map(o=>`<option value="${o.id}">${o.name}</option>`).join("")}</select>`;inner.appendChild(sel);
+      const btn=document.createElement("button");btn.className="btn btn-purple";btn.textContent="🔄 Transfer";
+      btn.onclick=()=>{
+        const toId=document.getElementById("tr-owner")?.value;
+        submitTransfer(item,toId);setState({modal:null,scanning:S.scanMode?true:false});
+      };inner.appendChild(btn);
+    }
+    const cancel=document.createElement("button");cancel.className="btn btn-ghost";cancel.textContent="Cancel";cancel.onclick=()=>setState({modal:null,scanning:S.scanMode?true:false});inner.appendChild(cancel);
+    return overlay(inner);
+  }
+
+  // ── Receive Order ──
+  if(modal.type==="receive_order"){
+    const{order,barcodes}=modal;const inner=modalInner();
+    inner.innerHTML=`<div class="modal-title">Receive Order</div><div class="modal-sub">${order.name} · ${barcodes.length} item${barcodes.length!==1?"s":""}</div>`;
+    if(profile.role==="admin"){
+      const sel=document.createElement("div");sel.className="field";
+      sel.innerHTML=`<label>Deliver To</label><select id="ro-owner">${owners.map(o=>`<option value="${o.id}">${o.name}</option>`).join("")}</select>`;inner.appendChild(sel);
+    }
+    const btn=document.createElement("button");btn.className="btn btn-green";btn.textContent="📦 Receive Order";
+    btn.onclick=()=>{
+      const toOwnerId=profile.role==="admin"?(document.getElementById("ro-owner")?.value||owners[0]?.id):profile.ownerId;
+      submitReceiveOrder(order,barcodes,toOwnerId);
+    };inner.appendChild(btn);
+    const cancel=document.createElement("button");cancel.className="btn btn-ghost";cancel.textContent="Cancel";cancel.onclick=()=>setState({modal:null});inner.appendChild(cancel);
+    return overlay(inner);
+  }
+
+  // ── Item Detail ──
+  if(modal.type==="item_detail"){
+    const{item}=modal;
+    const page=document.createElement("div");page.className="full-page";
+    const inner=document.createElement("div");inner.className="full-inner";
+    const ownerName=owners.find(o=>o.id===item.ownerId)?.name||item.ownerId;
+    const statusClass={active:"status-active",used:"status-used",transit:"status-transit"}[item.status]||"status-active";
+
+    const topRow=document.createElement("div");topRow.style.cssText="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;padding-top:8px";
+    topRow.innerHTML=`<div><div style="font-size:20px;font-weight:800">${item.name}</div><div style="font-family:monospace;font-size:12px;color:var(--muted);margin-top:2px">${item.barcode}</div></div><span class="status-badge ${statusClass}" style="font-size:12px;padding:5px 12px">${item.status}</span>`;
+    const xBtn=document.createElement("button");xBtn.style.cssText="background:var(--surface2);border:1px solid var(--border);color:var(--dim);font-size:16px;border-radius:8px;padding:8px 12px;cursor:pointer;margin-left:8px;flex-shrink:0";xBtn.textContent="✕";xBtn.onclick=()=>setState({modal:null});
+    topRow.querySelector("div").after(xBtn);// won't work cleanly, let me restructure
+    inner.appendChild(topRow);
+
+    // Status card
+    const sc=document.createElement("div");sc.className="card mb16";
+    sc.innerHTML=`<div class="label">Current Status</div><div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:4px">
+      <div><div style="color:var(--muted);font-size:11px">Location</div><div style="font-weight:700">${ownerName}</div></div>
+      <div><div style="color:var(--muted);font-size:11px">Category</div><div style="font-weight:700">${item.type||"—"}</div></div>
+      <div><div style="color:var(--muted);font-size:11px">Expires</div><div style="font-weight:700">${item.expDate?item.expDate.substring(0,10):"—"}</div></div>
+      ${item.usedBy?`<div><div style="color:var(--muted);font-size:11px">Used By</div><div style="font-weight:700">${item.usedBy}</div></div>`:""}
+    </div>`;
+    inner.appendChild(sc);
+
+    // Actions
+    const actDiv=document.createElement("div");actDiv.style.cssText="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap";
+    if(item.status==="active"){
+      if(profile.role==="admin"||item.ownerId===profile.ownerId){
+        const coBtn=document.createElement("button");coBtn.className="btn btn-amber";coBtn.style.cssText+="flex:1;min-width:120px";coBtn.textContent="Check Out";
+        coBtn.onclick=()=>setState({modal:{type:"checkout",item}});actDiv.appendChild(coBtn);
+      }
+      if(profile.role==="admin"||(owners.length>1&&item.ownerId!==profile.ownerId)){
+        const trBtn=document.createElement("button");trBtn.className="btn btn-purple";trBtn.style.cssText+="flex:1;min-width:120px";trBtn.textContent="Transfer";
+        trBtn.onclick=()=>setState({modal:{type:"transfer",item}});actDiv.appendChild(trBtn);
+      }
+    }
+    if(item.status==="used"&&(profile.role==="admin"||item.ownerId===profile.ownerId)){
+      const ucBtn=document.createElement("button");ucBtn.className="btn btn-blue";ucBtn.style.cssText+="flex:1";ucBtn.textContent="↩️ Undo Checkout";
+      ucBtn.onclick=()=>{setState({modal:{type:"undo_checkout",item}});};actDiv.appendChild(ucBtn);
+    }
+    if(actDiv.children.length>0)inner.appendChild(actDiv);
+
+    // History
+    const itemLog=S.log.filter(l=>l.barcode===item.barcode);
+    const logHdr=document.createElement("div");logHdr.className="label";logHdr.textContent=`Activity History (${itemLog.length} events)`;inner.appendChild(logHdr);
+    if(itemLog.length===0){const e=document.createElement("div");e.style.cssText="color:var(--muted);font-size:13px;text-align:center;padding:20px 0";e.textContent="No activity recorded yet";inner.appendChild(e);}
+    else{
+      const actionColors={CHECK_IN:"#22c55e",CHECK_OUT:"#f59e0b",TRANSFER:"#6366f1",ORDER_IN:"#0ea5e9",ORDER_OUT:"#a855f7",UNDO_CHECKOUT:"#94a3b8"};
+      const actionIcons={CHECK_IN:"📥",CHECK_OUT:"📤",TRANSFER:"🔄",ORDER_IN:"📦",ORDER_OUT:"🚚",UNDO_CHECKOUT:"↩️"};
+      itemLog.forEach(entry=>{
+        const row=document.createElement("div");row.className="log-row";
+        const icon=document.createElement("span");icon.style.cssText="font-size:18px;margin-top:2px";icon.textContent=actionIcons[entry.action]||"📋";
+        const info=document.createElement("div");info.style.flex="1";
+        const color=actionColors[entry.action]||"#94a3b8";
+        let detail="";if(entry.from&&entry.to)detail=entry.from+" → "+entry.to;else if(entry.to)detail="→ "+entry.to;
+        info.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center"><span style="color:${color};font-weight:700;font-size:12px">${(entry.action||"").replace(/_/g," ")}</span><span style="color:var(--muted);font-size:10px">${formatDate(entry.ts)}</span></div>${detail?`<div style="color:var(--dim);font-size:12px;margin-top:3px">${detail}</div>`:""}<div style="color:var(--muted);font-size:11px;margin-top:2px">by ${entry.user}</div>`;
+        row.appendChild(icon);row.appendChild(info);inner.appendChild(row);
+      });
+    }
+    const closeBtn=document.createElement("button");closeBtn.className="btn btn-ghost";closeBtn.style.marginTop="16px";closeBtn.textContent="Close";closeBtn.onclick=()=>setState({modal:null});inner.appendChild(closeBtn);
+    page.appendChild(inner);return page;
+  }
+
+  // ── Undo Checkout Confirm ──
+  if(modal.type==="undo_checkout"){
+    const{item}=modal;const inner=modalInner();
+    const lastCheckout=S.log.find(l=>l.barcode===item.barcode&&l.action==="CHECK_OUT");
+    const prevLocation=lastCheckout?.from||"Pool";
+    inner.innerHTML=`<div class="modal-title">Undo Checkout?</div><div class="modal-sub">${item.name} will be returned to: <strong style="color:var(--text)">${prevLocation}</strong></div>`;
+    const btn=document.createElement("button");btn.className="btn btn-primary";btn.textContent="✓ Yes, Undo Checkout";
+    btn.onclick=()=>{setState({modal:null});submitUndoCheckout(item);};inner.appendChild(btn);
+    const cancel=document.createElement("button");cancel.className="btn btn-ghost";cancel.textContent="Cancel";cancel.onclick=()=>setState({modal:{type:"item_detail",item}});inner.appendChild(cancel);
+    return overlay(inner);
+  }
+
+  // ── Manage Users ──
+  if(modal.type==="manage_users"){
+    const inner=modalInner();
+    inner.innerHTML=`<div class="modal-title">Team Members</div><div class="modal-sub">${S.tenantUsers.length} member${S.tenantUsers.length!==1?"s":""}</div>`;
+    S.tenantUsers.forEach(u=>{
+      const r=document.createElement("div");r.style.cssText="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center";
+      const ownerName=owners.find(o=>o.id===u.ownerId)?.name||u.ownerId||"—";
+      r.innerHTML=`<div><div style="font-weight:700;font-size:14px">${u.displayName||u.email}</div><div style="font-size:12px;color:var(--muted)">${u.email} · ${ownerName}</div></div><span style="font-size:11px;font-weight:700;color:${u.role==="admin"?"var(--primary)":"var(--dim)"};text-transform:uppercase">${u.role}</span>`;
+      inner.appendChild(r);
+    });
+    const closeBtn=document.createElement("button");closeBtn.className="btn btn-ghost";closeBtn.textContent="Close";closeBtn.onclick=()=>setState({modal:null});inner.appendChild(closeBtn);
+    return overlay(inner);
+  }
+
+  // ── Manage Owners/Locations ──
+  if(modal.type==="manage_owners"){
+    const inner=modalInner();
+    inner.innerHTML=`<div class="modal-title">Inventory Locations</div><div class="modal-sub">Add locations like warehouses, vehicles, or people</div>`;
+    owners.forEach(o=>{
+      const r=document.createElement("div");r.style.cssText="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center";
+      r.innerHTML=`<span style="font-weight:600">${o.name}</span><span style="font-size:11px;color:var(--muted);text-transform:uppercase">${o.type||"location"}</span>`;
+      inner.appendChild(r);
+    });
+    // Add new
+    inner.innerHTML+=`<div style="margin-top:12px;font-size:11px;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Add Location</div>`;
+    const newField=document.createElement("div");newField.style.display="flex";newField.style.gap="8px";
+    newField.innerHTML=`<input id="new-owner-name" type="text" placeholder="Location name" style="flex:1;padding:10px 12px;border-radius:8px;background:var(--surface2);border:1px solid var(--border);color:var(--text)"/>`;
+    const addBtn=document.createElement("button");addBtn.style.cssText="background:var(--primary);color:#fff;border:none;border-radius:8px;padding:10px 16px;font-weight:700;cursor:pointer;white-space:nowrap";addBtn.textContent="Add";
+    addBtn.onclick=async()=>{
+      const name=document.getElementById("new-owner-name")?.value.trim();
+      if(!name){showToast("Enter a location name","warn");return;}
+      const id=name.toUpperCase().replace(/\s+/g,"_");
+      await window._setDoc(tCol("owners"),id,{name,type:"location"});
+      showToast("✅ Location added");
+      loadData();setState({modal:null});
+    };
+    newField.appendChild(addBtn);inner.appendChild(newField);
+    const closeBtn=document.createElement("button");closeBtn.className="btn btn-ghost";closeBtn.style.marginTop="12px";closeBtn.textContent="Close";closeBtn.onclick=()=>setState({modal:null});inner.appendChild(closeBtn);
+    return overlay(inner);
+  }
+
+  // ── Invite ──
+  if(modal.type==="invite"){
+    const inner=modalInner();
+    inner.innerHTML=`<div class="modal-title">Invite Team Member</div><div class="modal-sub">Set the role and location, then share the link</div>`;
+    const roleField=document.createElement("div");roleField.className="field";
+    roleField.innerHTML=`<label>Role</label><select id="inv-role"><option value="member">Member</option><option value="admin">Admin</option></select>`;inner.appendChild(roleField);
+    const ownerField=document.createElement("div");ownerField.className="field";
+    ownerField.innerHTML=`<label>Assign to Location</label><select id="inv-owner">${owners.map(o=>`<option value="${o.id}">${o.name}</option>`).join("")}</select>`;inner.appendChild(ownerField);
+    const resultDiv=document.createElement("div");resultDiv.style.display="none";
+    resultDiv.innerHTML=`<div style="background:var(--primary-glow);border:1px solid var(--primary);border-radius:8px;padding:12px 14px;margin-bottom:12px"><div style="font-size:11px;font-weight:700;color:var(--primary);text-transform:uppercase;margin-bottom:6px">Invite Link — share this:</div><div id="inv-link-text" style="font-size:12px;color:var(--text);word-break:break-all;font-family:monospace"></div></div>`;
+    inner.appendChild(resultDiv);
+    const genBtn=document.createElement("button");genBtn.className="btn btn-primary";genBtn.textContent="Generate Invite Link";
+    genBtn.onclick=async()=>{
+      const role=document.getElementById("inv-role")?.value;
+      const ownerId=document.getElementById("inv-owner")?.value;
+      const ownerName=owners.find(o=>o.id===ownerId)?.name||"";
+      const tenantName=S.tenant?.name||"";
+      const expiresAt=new Date(Date.now()+7*24*60*60*1000).toISOString();// 7 days
+      genBtn.disabled=true;genBtn.textContent="Generating…";
+      try{
+        const code=await window._addDoc("invites",{
+          tenantId:S.profile.tenantId,tenantName,role,ownerId,ownerName,
+          createdBy:S.profile.displayName,createdAt:new Date().toISOString(),
+          expiresAt,usedBy:null
+        });
+        const link=`${window.location.origin}${window.location.pathname}?invite=${code}`;
+        const linkText=document.getElementById("inv-link-text");
+        if(linkText)linkText.textContent=link;
+        resultDiv.style.display="block";
+        genBtn.textContent="✓ Link Generated";
+        // Copy to clipboard
+        try{await navigator.clipboard.writeText(link);showToast("✅ Invite link copied to clipboard!");}
+        catch{showToast("Link generated — copy it above");}
+      }catch(e){showToast("Failed: "+e.message,"err");genBtn.disabled=false;genBtn.textContent="Generate Invite Link";}
+    };
+    inner.appendChild(genBtn);
+    const closeBtn=document.createElement("button");closeBtn.className="btn btn-ghost";closeBtn.style.marginTop="10px";closeBtn.textContent="Close";closeBtn.onclick=()=>setState({modal:null});inner.appendChild(closeBtn);
+    return overlay(inner);
+  }
+
+  return null;
+}
+
+// ── AUTH ERROR MESSAGES ───────────────────────────────────────────────────────
+function friendlyError(code){
+  const map={
+    "auth/invalid-email":"Please enter a valid email.",
+    "auth/user-not-found":"No account found with that email.",
+    "auth/wrong-password":"Incorrect password.",
+    "auth/invalid-credential":"Incorrect email or password.",
+    "auth/email-already-in-use":"An account with that email already exists.",
+    "auth/weak-password":"Password must be at least 6 characters.",
+    "auth/too-many-requests":"Too many attempts. Please wait and try again.",
+    "auth/network-request-failed":"Network error. Check your connection.",
+  };
+  return map[code]||"Something went wrong. Please try again.";
+}
+
+// ── INIT ──────────────────────────────────────────────────────────────────────
+async function init(){
+  render();
+  const params=new URLSearchParams(window.location.search);
+  const inviteCode=params.get("invite");
+  if(inviteCode)S.inviteCode=inviteCode;
 
   await waitForFirebase();
 
-  // Try to pre-fetch invite data to show org name on login/signup
-  if (inviteCode) {
-    try {
-      const inv = await window._getDoc('invites', inviteCode);
-      if (inv && !inv.usedBy) S.inviteData = inv;
-    } catch(e) { /* ignore */ }
+  if(inviteCode){
+    try{const inv=await window._getDoc("invites",inviteCode);if(inv&&!inv.usedBy)S.inviteData=inv;}catch(e){}
   }
 
-  // Listen for auth state
-  window._onAuth(async (user) => {
-    if (!user) {
-      setState({ screen: 'login', user: null, profile: null, tenant: null });
-      return;
-    }
-
-    setState({ user, screen: 'loading' });
-
-    // Load user profile from Firestore
-    let profile = null;
-    try { profile = await window._getDoc('users', user.uid); } catch(e) { console.error(e); }
-
-    if (!profile) {
-      // Signed in but no Firestore profile — send to signup to complete
-      setState({ screen: 'signup' });
-      return;
-    }
-
-    setState({ profile });
-
-    // No tenant yet → go to org setup (or skip to join if invite in URL)
-    if (!profile.tenantId) {
-      setState({ screen: S.inviteCode ? 'join-org' : 'org-setup' });
-      return;
-    }
-
-    // Load tenant info and go to app
-    let tenant = null;
-    try { tenant = await window._getDoc('tenants', profile.tenantId); } catch(e) { console.error(e); }
-    setState({ tenant, screen: 'app' });
+  window._onAuth(async(user)=>{
+    if(!user){setState({screen:"login",user:null,profile:null,tenant:null});return;}
+    setState({user,screen:"loading"});
+    let profile=null;
+    try{profile=await window._getDoc("users",user.uid);}catch(e){console.error(e);}
+    if(!profile){setState({screen:"signup"});return;}
+    setState({profile});
+    if(!profile.tenantId){setState({screen:S.inviteCode?"join-org":"org-setup"});return;}
+    let tenant=null;
+    try{tenant=await window._getDoc("tenants",profile.tenantId);}catch(e){console.error(e);}
+    setState({tenant,screen:"app"});
+    loadData();
   });
+}
+
+// Background sync every 60 seconds
+setInterval(()=>{if(S.screen==="app"&&!S.loading)loadData();},60000);
+
+if("serviceWorker" in navigator){
+  navigator.serviceWorker.getRegistrations().then(regs=>{regs.forEach(r=>r.unregister());});
 }
 
 init();
