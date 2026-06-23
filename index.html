@@ -48,6 +48,7 @@
     window.fsAddTenant  = async (d)    => { const r=await addDoc(collection(db,"tenants"),d); return r.id; };
     window.fsGetInvite  = async (code) => { const s=await getDoc(doc(db,"invites",code)); return s.exists()?{_id:s.id,...s.data()}:null; };
     window.fsUpdateInvite = async (code,d) => { await updateDoc(doc(db,"invites",code),d); };
+    window.fsAddInvite = async (data) => { const r=await addDoc(collection(db,"invites"),data); return r.id; };
     window.fsSetTenantUser  = async (tid,uid,d) => { await setDoc(doc(db,"tenants/"+tid+"/users",uid),d); };
     window.fsSetTenantOwner = async (tid,oid,d) => { await setDoc(doc(db,"tenants/"+tid+"/owners",oid),d); };
     window._firebaseReady = true;
@@ -500,7 +501,7 @@ function renderApp(){
   if(admin){const btn=el("button",{class:"action-btn",style:{background:"#a855f718",border:"1px solid #a855f733",color:"#c084fc"}});btn.innerHTML='<span style="font-size:20px">🗃</span><span>Order</span>';btn.onclick=()=>setState({orderItems:[],showOrderItemScan:true,showOrderQRScan:false,showOrderSummary:false,pendingOrderQR:null,scanning:true,scanHint:"Scan items to add to order"});actions.appendChild(btn);}
   wrap.appendChild(actions);
   const tabs=el("div",{style:{display:"flex",borderBottom:"1px solid #1e293b",background:"#111827"}});
-  [["dashboard","Dashboard"],["inventory","Inventory"],["used","Used"],["orders","Orders"],["log","Log"]].forEach(([id,label])=>{
+  [["dashboard","Dashboard"],["inventory","Inventory"],["used","Used"],["orders","Orders"],["log","Log"],["settings","Settings"]].forEach(([id,label])=>{
     const btn=el("button",{class:"tab-btn",style:{color:tab===id?"#38bdf8":"#475569",fontWeight:tab===id?"700":"500",borderBottom:tab===id?"2px solid #38bdf8":"2px solid transparent",fontSize:"12px"}},label);
     btn.onclick=()=>setState({tab:id});tabs.appendChild(btn);
   });
@@ -598,7 +599,118 @@ function renderApp(){
       content.appendChild(card);
     });
   }
+  if(tab==="settings"){content.appendChild(renderSettings());}
   wrap.appendChild(content);return wrap;
+}
+
+function renderSettings(){
+  const profile=getProfile(),admin=isAdmin();
+  const wrap=el("div");
+
+  // ── ORG INFO ──
+  wrap.appendChild(el("p",{style:{color:"#475569",fontSize:"11px",fontWeight:"600",margin:"0 0 8px",textTransform:"uppercase",letterSpacing:".07em"}},"Organization"));
+  const orgCard=el("div",{class:"card"});
+  orgCard.innerHTML='<div style="font-weight:700;color:#f1f5f9;font-size:15px">'+(S.tenant?.name||"—")+'</div><div style="color:#64748b;font-size:12px;margin-top:4px">Plan: Free</div>';
+  wrap.appendChild(orgCard);
+
+  // ── YOUR ACCOUNT ──
+  wrap.appendChild(el("p",{style:{color:"#475569",fontSize:"11px",fontWeight:"600",margin:"16px 0 8px",textTransform:"uppercase",letterSpacing:".07em"}},"Your Account"));
+  const acctCard=el("div",{class:"card"});
+  acctCard.innerHTML='<div style="font-weight:700;color:#f1f5f9;font-size:15px">'+profile.displayName+'</div><div style="color:#64748b;font-size:13px;margin-top:4px">'+profile.email+'</div><div style="margin-top:8px"><span style="background:'+(admin?"#818cf822":"#0ea5e922")+';color:'+(admin?"#818cf8":"#38bdf8")+';border:1px solid '+(admin?"#818cf844":"#0ea5e944")+';border-radius:6px;font-size:11px;font-weight:700;padding:3px 10px;text-transform:uppercase">'+(profile.role||"member")+'</span></div>';
+  wrap.appendChild(acctCard);
+
+  if(admin){
+    // ── TEAM MEMBERS ──
+    wrap.appendChild(el("p",{style:{color:"#475569",fontSize:"11px",fontWeight:"600",margin:"16px 0 8px",textTransform:"uppercase",letterSpacing:".07em"}},"Team Members ("+S.users.length+")"));
+    if(S.users.length===0){wrap.appendChild(el("p",{style:{color:"#334155",fontSize:"13px",textAlign:"center",padding:"16px 0"}},"No team members yet"));}
+    S.users.forEach(u=>{
+      const ow=S.owners.find(o=>o.id===u.ownerId);
+      const uc=el("div",{class:"card"});
+      uc.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center"><div><div style="font-weight:700;color:#f1f5f9;font-size:14px">'+(u.displayName||u.email||"—")+'</div><div style="color:#64748b;font-size:12px;margin-top:3px">'+(u.email||"")+(ow?" · "+ow.name:"")+'</div></div><span style="background:'+(u.role==="admin"?"#818cf822":"#0ea5e922")+';color:'+(u.role==="admin"?"#818cf8":"#38bdf8")+';border:1px solid '+(u.role==="admin"?"#818cf844":"#0ea5e944")+';border-radius:6px;font-size:11px;font-weight:700;padding:3px 10px;text-transform:uppercase">'+(u.role||"member")+'</span></div>';
+      wrap.appendChild(uc);
+    });
+
+    // ── INVITE A USER ──
+    wrap.appendChild(el("p",{style:{color:"#475569",fontSize:"11px",fontWeight:"600",margin:"16px 0 8px",textTransform:"uppercase",letterSpacing:".07em"}},"Invite a Team Member"));
+    const invCard=el("div",{class:"card"});
+    invCard.appendChild(el("p",{style:{color:"#64748b",fontSize:"13px",margin:"0 0 14px"}},"Choose a role and location, then generate a link to send."));
+
+    const rl=el("label",{class:"label"},"Role");
+    const rs=el("select",{id:"inv-role"});
+    [["member","Member — can check in/out their items"],["admin","Admin — full access"]].forEach(([v,t])=>rs.appendChild(el("option",{value:v},t)));
+    invCard.appendChild(rl);invCard.appendChild(rs);invCard.appendChild(el("div",{style:{height:"12px"}}));
+
+    const ol=el("label",{class:"label"},"Assign to Location");
+    const os=el("select",{id:"inv-owner"});
+    S.owners.forEach(o=>{const icon=o.id.toUpperCase()==="POOL"?"🏪":o.type==="locker"?"🗄":"👤";os.appendChild(el("option",{value:o.id},icon+" "+o.name));});
+    invCard.appendChild(ol);invCard.appendChild(os);invCard.appendChild(el("div",{style:{height:"16px"}}));
+
+    const resultBox=el("div",{id:"inv-result",style:{display:"none",background:"#0f172a",border:"1px solid #334155",borderRadius:"9px",padding:"14px",marginBottom:"14px"}});
+    invCard.appendChild(resultBox);
+
+    const genBtn=el("button",{class:"btn btn-purple"},"Generate Invite Link");
+    genBtn.onclick=async()=>{
+      const role=document.getElementById("inv-role")?.value||"member";
+      const ownerId=document.getElementById("inv-owner")?.value||"POOL";
+      genBtn.disabled=true;genBtn.textContent="Generating…";
+      try{
+        const expires=new Date(Date.now()+7*24*60*60*1000).toISOString();
+        const inviteId=await window.fsAddInvite({
+          tenantId:S.profile.tenantId,tenantName:S.tenant?.name||"",
+          role,ownerId,createdBy:S.profile.displayName,
+          createdAt:new Date().toISOString(),expiresAt:expires,usedBy:null
+        });
+        const inviteURL=window.location.origin+window.location.pathname+"?invite="+inviteId;
+        const rb=document.getElementById("inv-result");
+        if(rb){
+          rb.style.display="block";
+          rb.innerHTML='<div style="color:#4ade80;font-weight:700;font-size:13px;margin-bottom:8px">✅ Invite link ready!</div>'
+            +'<div style="color:#94a3b8;font-size:11px;margin-bottom:4px">Role: <span style="color:#f1f5f9;font-weight:600">'+role+'</span> · Location: <span style="color:#f1f5f9;font-weight:600">'+(S.owners.find(o=>o.id===ownerId)?.name||ownerId)+'</span></div>'
+            +'<div style="color:#94a3b8;font-size:11px;margin-bottom:10px">Expires in 7 days · One use only</div>'
+            +'<div style="background:#111827;border-radius:7px;padding:10px 12px;font-family:monospace;font-size:11px;color:#38bdf8;word-break:break-all;margin-bottom:10px">'+inviteURL+'</div>';
+          const copyBtn=document.createElement("button");
+          copyBtn.style.cssText="width:100%;padding:12px;border-radius:9px;border:1px solid #334155;background:#1e293b;color:#f1f5f9;font-weight:700;font-size:14px;cursor:pointer;font-family:inherit;";
+          copyBtn.textContent="📋 Copy Link";
+          copyBtn.onclick=()=>{
+            navigator.clipboard.writeText(inviteURL)
+              .then(()=>{copyBtn.textContent="✅ Copied!";setTimeout(()=>{copyBtn.textContent="📋 Copy Link";},2500);})
+              .catch(()=>{prompt("Copy this invite link:",inviteURL);});
+          };
+          rb.appendChild(copyBtn);
+        }
+        genBtn.textContent="Generate Another";genBtn.disabled=false;
+      }catch(e){console.error(e);showToast("Failed to generate invite: "+e.message,"err");genBtn.disabled=false;genBtn.textContent="Generate Invite Link";}
+    };
+    invCard.appendChild(genBtn);
+    wrap.appendChild(invCard);
+
+    // ── LOCATIONS (placeholder) ──
+    wrap.appendChild(el("p",{style:{color:"#475569",fontSize:"11px",fontWeight:"600",margin:"16px 0 8px",textTransform:"uppercase",letterSpacing:".07em"}},"Locations"));
+    const locCard=el("div",{class:"card"});
+    S.owners.forEach((o,i)=>{
+      const icon=o.id.toUpperCase()==="POOL"?"🏪":o.type==="locker"?"🗄":"👤";
+      const row=el("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 0",borderBottom:i<S.owners.length-1?"1px solid #1e293b":"none"}});
+      row.innerHTML='<div style="display:flex;align-items:center;gap:8px"><span style="font-size:18px">'+icon+'</span><span style="color:#f1f5f9;font-size:14px;font-weight:600">'+o.name+'</span></div><span style="color:#475569;font-size:12px">'+(o.type||"")+'</span>';
+      locCard.appendChild(row);
+    });
+    locCard.appendChild(el("p",{style:{color:"#334155",fontSize:"12px",margin:"10px 0 0",textAlign:"center"}},"Add / edit locations — coming soon"));
+    wrap.appendChild(locCard);
+
+    // ── ITEM TYPES (placeholder) ──
+    wrap.appendChild(el("p",{style:{color:"#475569",fontSize:"11px",fontWeight:"600",margin:"16px 0 8px",textTransform:"uppercase",letterSpacing:".07em"}},"Item Types & Categories"));
+    const itCard=el("div",{class:"card"});
+    itCard.innerHTML='<p style="color:#334155;font-size:13px;text-align:center;margin:0">Customize item types, dropdowns & expiry rules — coming soon</p>';
+    wrap.appendChild(itCard);
+  }
+
+  // ── SIGN OUT ──
+  wrap.appendChild(el("p",{style:{color:"#475569",fontSize:"11px",fontWeight:"600",margin:"16px 0 8px",textTransform:"uppercase",letterSpacing:".07em"}},"Session"));
+  const soBtn=el("button",{class:"btn btn-dark"},"⇥  Sign Out");
+  soBtn.style.marginTop="0";
+  soBtn.onclick=()=>{stopScanner();window.firebaseSignOut();setState({screen:"login",firebaseUser:null,profile:null,tenant:null,owners:[],items:[],log:[],orders:[],users:[],showAccountMenu:false,tab:"dashboard"});};
+  wrap.appendChild(soBtn);
+
+  return wrap;
 }
 
 function renderScanner(){
