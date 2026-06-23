@@ -49,6 +49,8 @@
     window.fsGetInvite  = async (code) => { const s=await getDoc(doc(db,"invites",code)); return s.exists()?{_id:s.id,...s.data()}:null; };
     window.fsUpdateInvite = async (code,d) => { await updateDoc(doc(db,"invites",code),d); };
     window.fsAddInvite = async (data) => { const r=await addDoc(collection(db,"invites"),data); return r.id; };
+    window.fsGetSettings = async () => { try{const s=await getDoc(doc(db,tc("settings"),"checkin"));return s.exists()?s.data():null;}catch(e){return null;} };
+    window.fsSetSettings = async (data) => { await setDoc(doc(db,tc("settings"),"checkin"),data); };
     window.fsSetTenantUser  = async (tid,uid,d) => { await setDoc(doc(db,"tenants/"+tid+"/users",uid),d); };
     window.fsSetTenantOwner = async (tid,oid,d) => { await setDoc(doc(db,"tenants/"+tid+"/owners",oid),d); };
     window._firebaseReady = true;
@@ -98,6 +100,7 @@ const S={
   showAccountMenu:false,tab:"dashboard",loading:false,toast:null,toastTimer:null,
   scanning:false,scanMode:null,scanHint:"",inventorySearch:"",modal:null,selectedOwner:null,
   showScanPrompt:false,owners:[],items:[],orders:[],log:[],users:[],
+  settings:{itemNames:["DFX","DFXM","BTFT","DTF-31","DTF-31Q","DTF-18","DTF-40","DTFD-13","DTFD-24","BVNA","RF UNIT","IntraVu","IntraVu Monitor"],descriptions:["Disposable","Capital Equipment"]},
   multiMode:false,multiDetails:null,multiCodes:[],
   showMultiDetails:false,showMultiScan:false,showMultiConfirm:false,
   activeOrder:null,showOrderGen:false,
@@ -112,12 +115,16 @@ async function loadData(){
   setState({loading:true});
   try{
     const [ownR,itmR,logR,usrR,ordR]=await Promise.allSettled([window.fsGetAll("owners"),window.fsGetAll("items"),window.fsGetAll("log"),window.fsGetAll("users"),window.fsGetAll("orders")]);
+    const settR=await window.fsGetSettings();
+    const defaults={itemNames:["DFX","DFXM","BTFT","DTF-31","DTF-31Q","DTF-18","DTF-40","DTFD-13","DTFD-24","BVNA","RF UNIT","IntraVu","IntraVu Monitor"],descriptions:["Disposable","Capital Equipment"]};
+    const settings=settR?{itemNames:settR.itemNames||defaults.itemNames,descriptions:settR.descriptions||defaults.descriptions}:defaults;
     setState({
       owners:(ownR.status==="fulfilled"?ownR.value:[]).map(o=>({id:o._id,name:o.name,type:o.type})),
       items:(itmR.status==="fulfilled"?itmR.value:[]).map(i=>({barcode:i._id,name:i.name,type:i.type,expDate:i.expDate,ownerId:i.ownerId,status:i.status||"active",addedAt:i.addedAt,usedBy:i.usedBy||""})),
       log:(logR.status==="fulfilled"?logR.value:[]).map(l=>({ts:l.ts,action:l.action,barcode:l.barcode,itemName:l.itemName,from:l.from,to:l.to,user:l.user})).sort((a,b)=>new Date(b.ts)-new Date(a.ts)),
       users:(usrR.status==="fulfilled"?usrR.value:[]).map(u=>({username:u._id,displayName:u.displayName,email:u.email,role:u.role,ownerId:u.ownerId||""})),
       orders:(ordR.status==="fulfilled"?ordR.value:[]).map(o=>({id:o._id,name:o.name,count:o.count,createdBy:o.createdBy,createdAt:o.createdAt,status:o.status,items:o.items||""})),
+      settings,
       loading:false
     });
   }catch(e){console.error("Load failed:",e);showToast("Could not load data","err");setState({loading:false});}
@@ -549,7 +556,7 @@ function renderApp(){
     const baseItems=admin?(selectedOwner?activeItems.filter(i=>i.ownerId===selectedOwner.id):activeItems):visActiveItems;
     const displayItems=searchTerm?baseItems.filter(i=>i.name.toLowerCase().includes(searchTerm)||i.barcode.toLowerCase().includes(searchTerm)):baseItems;
     if(displayItems.length>0){
-      const itemTypes=["DFX","DFXM","BTFT","DTF-31","DTF-31Q","DTF-18","DTF-40","DTFD-13","DTFD-24","BVNA","RF UNIT","IntraVu","IntraVu Monitor"];
+      const itemTypes=S.settings.itemNames||[];
       const counts={};displayItems.forEach(item=>{if(itemTypes.includes(item.name))counts[item.name]=(counts[item.name]||0)+1;});
       if(Object.keys(counts).length>0){
         const sc=document.createElement("div");sc.style.cssText="background:#111827;border-radius:12px;border:1px solid #1e293b;padding:14px 16px;margin-bottom:16px;";
@@ -684,6 +691,57 @@ function renderSettings(){
     invCard.appendChild(genBtn);
     wrap.appendChild(invCard);
 
+    // ── CHECK-IN OPTIONS ──
+    wrap.appendChild(el("p",{style:{color:"#475569",fontSize:"11px",fontWeight:"600",margin:"16px 0 8px",textTransform:"uppercase",letterSpacing:".07em"}},"Check-In Options"));
+    const ciCard=el("div",{class:"card"});
+
+    async function saveSettings(newSettings){
+      try{await window.fsSetSettings(newSettings);setState({settings:newSettings});showToast("✅ Settings saved");}
+      catch(e){showToast("Failed to save: "+e.message,"err");}
+    }
+
+    function renderTagEditor(parent,labelText,listKey,placeholder){
+      const section=el("div",{style:{marginBottom:"20px"}});
+      section.appendChild(el("label",{class:"label"},labelText));
+      const listWrap=el("div",{id:"tags-"+listKey,style:{display:"flex",flexWrap:"wrap",gap:"8px",marginBottom:"10px"}});
+      function refreshTags(){
+        listWrap.innerHTML="";
+        const items=S.settings[listKey]||[];
+        if(items.length===0){listWrap.appendChild(el("span",{style:{color:"#334155",fontSize:"13px"}},"No items yet"));}
+        items.forEach(item=>{
+          const chip=el("div",{style:{display:"flex",alignItems:"center",gap:"6px",background:"#1e293b",border:"1px solid #334155",borderRadius:"7px",padding:"6px 10px"}});
+          chip.appendChild(el("span",{style:{color:"#f1f5f9",fontSize:"13px",fontWeight:"600"}},item));
+          const rmBtn=el("button",{style:{background:"none",border:"none",color:"#475569",fontSize:"16px",cursor:"pointer",lineHeight:"1",padding:"0 2px"}},"×");
+          rmBtn.onclick=async()=>{
+            const updated={...S.settings,[listKey]:(S.settings[listKey]||[]).filter(i=>i!==item)};
+            await saveSettings(updated);
+          };
+          chip.appendChild(rmBtn);listWrap.appendChild(chip);
+        });
+      }
+      refreshTags();
+      section.appendChild(listWrap);
+      const addRow=el("div",{style:{display:"flex",gap:"8px"}});
+      const addInput=el("input",{type:"text",placeholder,style:{flex:"1",padding:"9px 12px",fontSize:"14px"}});
+      const addBtn=el("button",{style:{padding:"9px 16px",borderRadius:"9px",border:"none",background:"#6366f1",color:"#fff",fontWeight:"700",fontSize:"14px",cursor:"pointer",whiteSpace:"nowrap"}},"+ Add");
+      addBtn.onclick=async()=>{
+        const val=addInput.value.trim();
+        if(!val){showToast("Enter a value first","warn");return;}
+        const current=S.settings[listKey]||[];
+        if(current.includes(val)){showToast("Already in the list","warn");return;}
+        const updated={...S.settings,[listKey]:[...current,val]};
+        addInput.value="";
+        await saveSettings(updated);
+      };
+      addInput.onkeydown=e=>{if(e.key==="Enter")addBtn.onclick();};
+      addRow.appendChild(addInput);addRow.appendChild(addBtn);section.appendChild(addRow);
+      parent.appendChild(section);
+    }
+
+    renderTagEditor(ciCard,"Item Names","itemNames","e.g. New Device Name");
+    renderTagEditor(ciCard,"Descriptions","descriptions","e.g. Rental, Loaner");
+    wrap.appendChild(ciCard);
+
     // ── LOCATIONS (placeholder) ──
     wrap.appendChild(el("p",{style:{color:"#475569",fontSize:"11px",fontWeight:"600",margin:"16px 0 8px",textTransform:"uppercase",letterSpacing:".07em"}},"Locations"));
     const locCard=el("div",{class:"card"});
@@ -752,12 +810,12 @@ function renderMultiDetails(){
   const tr=el("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"20px"}});tr.innerHTML='<h2 style="color:#f1f5f9;font-size:18px;font-weight:700;margin:0">Item Details</h2>';
   const cb=el("button",{style:{background:"none",border:"none",color:"#475569",fontSize:"24px",cursor:"pointer"}},"✕");cb.onclick=()=>setState({showMultiDetails:false,multiMode:false,multiCodes:[],scanMode:null});tr.appendChild(cb);inner.appendChild(tr);
   inner.appendChild(el("p",{style:{color:"#64748b",fontSize:"13px",margin:"0 0 20px"}},"Enter details once — they'll apply to all scanned items."));
-  const sn1=el("select");sn1.appendChild(el("option",{value:""},"Select item…"));["DFX","DFXM","BTFT","DTF-31","DTF-31Q","DTF-18","DTF-40","DTFD-13","DTFD-24","BVNA","RF UNIT","IntraVu","IntraVu Monitor"].forEach(i=>sn1.appendChild(el("option",{value:i},i)));sn1.onchange=function(){name=this.value;};
+  const sn1=el("select");sn1.appendChild(el("option",{value:""},"Select item…"));(S.settings.itemNames||[]).forEach(i=>sn1.appendChild(el("option",{value:i},i)));sn1.onchange=function(){name=this.value;};
   inner.appendChild(el("label",{class:"label"},"Item Name"));inner.appendChild(sn1);inner.appendChild(el("div",{style:{height:"14px"}}));
-  const sn2=el("select");sn2.appendChild(el("option",{value:""},"Select type…"));["Disposable","Capital Equipment"].forEach(t=>sn2.appendChild(el("option",{value:t},t)));sn2.onchange=function(){type=this.value;};
-  inner.appendChild(el("label",{class:"label"},"Equipment Type"));inner.appendChild(sn2);inner.appendChild(el("div",{style:{height:"14px"}}));
+  const sn2=el("select");sn2.appendChild(el("option",{value:""},"Select description… (optional)"));(S.settings.descriptions||[]).forEach(t=>sn2.appendChild(el("option",{value:t},t)));sn2.onchange=function(){type=this.value;};
+  inner.appendChild(el("label",{class:"label"},"Description"));inner.appendChild(sn2);inner.appendChild(el("div",{style:{height:"14px"}}));
   const in3=el("input",{type:"date"});in3.oninput=function(){expDate=this.value;};
-  inner.appendChild(el("label",{class:"label"},"Expiration Date"));inner.appendChild(in3);inner.appendChild(el("div",{style:{height:"14px"}}));
+  inner.appendChild(el("label",{class:"label"},"Expiration Date (optional)"));inner.appendChild(in3);inner.appendChild(el("div",{style:{height:"14px"}}));
   const nb=el("button",{class:"btn btn-green"},"Next — Scan QR Codes →");
   nb.onclick=()=>{if(!name){showToast("Enter item name","warn");return;}setState({showMultiDetails:false,showMultiScan:true,multiDetails:{name,type,expDate},scanning:true,scanHint:"Scan QR codes — tap Done when finished"});};
   inner.appendChild(nb);div.appendChild(inner);return div;
@@ -849,9 +907,9 @@ function renderModal(){
     const bp=document.createElement("p");bp.style.cssText="color:#64748b;font-size:12px;font-family:monospace;margin:0 0 16px;";bp.textContent="Barcode: "+modal.barcode;inner.appendChild(bp);
     let name="",type="",expDate="";
     const n1=document.createElement("label");n1.style.cssText="color:#94a3b8;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:6px;";n1.textContent="Item Name";
-    const i1=document.createElement("select");i1.style.cssText="width:100%;background:#0f172a;border:1px solid #334155;border-radius:9px;color:#f1f5f9;padding:11px 14px;font-size:15px;font-family:inherit;margin-bottom:14px;box-sizing:border-box;-webkit-appearance:none;";const d1=document.createElement("option");d1.value="";d1.textContent="Select item…";i1.appendChild(d1);["DFX","DFXM","BTFT","DTF-31","DTF-31Q","DTF-18","DTF-40","DTFD-13","DTFD-24","BVNA","RF UNIT","IntraVu","IntraVu Monitor"].forEach(function(item){const o=document.createElement("option");o.value=item;o.textContent=item;i1.appendChild(o);});i1.onchange=function(){name=this.value;};inner.appendChild(n1);inner.appendChild(i1);
-    const n2=document.createElement("label");n2.style.cssText="color:#94a3b8;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:6px;";n2.textContent="Equipment Type";const i2=document.createElement("select");i2.style.cssText="width:100%;background:#0f172a;border:1px solid #334155;border-radius:9px;color:#f1f5f9;padding:11px 14px;font-size:15px;font-family:inherit;margin-bottom:14px;box-sizing:border-box;-webkit-appearance:none;";const d2=document.createElement("option");d2.value="";d2.textContent="Select type…";i2.appendChild(d2);["Disposable","Capital Equipment"].forEach(function(t){const o=document.createElement("option");o.value=t;o.textContent=t;i2.appendChild(o);});i2.onchange=function(){type=this.value;};inner.appendChild(n2);inner.appendChild(i2);
-    const n3=document.createElement("label");n3.style.cssText="color:#94a3b8;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:6px;";n3.textContent="Expiration Date";const i3=document.createElement("input");i3.type="date";i3.style.cssText="width:100%;background:#0f172a;border:1px solid #334155;border-radius:9px;color:#f1f5f9;padding:11px 14px;font-size:15px;font-family:inherit;margin-bottom:14px;box-sizing:border-box;";i3.oninput=function(){expDate=this.value;};inner.appendChild(n3);inner.appendChild(i3);
+    const i1=document.createElement("select");i1.style.cssText="width:100%;background:#0f172a;border:1px solid #334155;border-radius:9px;color:#f1f5f9;padding:11px 14px;font-size:15px;font-family:inherit;margin-bottom:14px;box-sizing:border-box;-webkit-appearance:none;";const d1=document.createElement("option");d1.value="";d1.textContent="Select item…";i1.appendChild(d1);(S.settings.itemNames||[]).forEach(function(item){const o=document.createElement("option");o.value=item;o.textContent=item;i1.appendChild(o);});i1.onchange=function(){name=this.value;};inner.appendChild(n1);inner.appendChild(i1);
+    const n2=document.createElement("label");n2.style.cssText="color:#94a3b8;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:6px;";n2.textContent="Description";const i2=document.createElement("select");i2.style.cssText="width:100%;background:#0f172a;border:1px solid #334155;border-radius:9px;color:#f1f5f9;padding:11px 14px;font-size:15px;font-family:inherit;margin-bottom:14px;box-sizing:border-box;-webkit-appearance:none;";const d2=document.createElement("option");d2.value="";d2.textContent="Select description… (optional)";i2.appendChild(d2);(S.settings.descriptions||[]).forEach(function(t){const o=document.createElement("option");o.value=t;o.textContent=t;i2.appendChild(o);});i2.onchange=function(){type=this.value;};inner.appendChild(n2);inner.appendChild(i2);
+    const n3=document.createElement("label");n3.style.cssText="color:#94a3b8;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:6px;";n3.textContent="Expiration Date (optional)";const i3=document.createElement("input");i3.type="date";i3.style.cssText="width:100%;background:#0f172a;border:1px solid #334155;border-radius:9px;color:#f1f5f9;padding:11px 14px;font-size:15px;font-family:inherit;margin-bottom:14px;box-sizing:border-box;";i3.oninput=function(){expDate=this.value;};inner.appendChild(n3);inner.appendChild(i3);
     const n4=document.createElement("label");n4.style.cssText="color:#94a3b8;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:6px;";n4.textContent="Assign To";const db=document.createElement("div");db.style.cssText="padding:11px 14px;border-radius:9px;border:1px solid #334155;background:#0f172a;color:#38bdf8;font-size:15px;font-weight:600;margin-bottom:6px;";db.textContent="🏪 "+(pool?.name||"General Pool");const dn=document.createElement("p");dn.style.cssText="color:#475569;font-size:11px;margin:0 0 20px;";dn.textContent="All items go to General Pool first.";inner.appendChild(n4);inner.appendChild(db);inner.appendChild(dn);
     const sb=document.createElement("button");sb.textContent="Confirm Check In";sb.style.cssText="width:100%;padding:16px;border-radius:10px;border:none;background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff;font-weight:700;font-size:16px;cursor:pointer;display:block;font-family:inherit;-webkit-appearance:none;";
     sb.onclick=function(){if(!name){showToast("Enter item name","warn");return;}if(!pool){showToast("No pool found","err");return;}setState({modal:null,loading:false});showToast("✅ "+name+" → "+(pool?.name||"Pool"));submitCheckin(modal.barcode,name,type,expDate,pool.id).catch(e=>console.error(e));};inner.appendChild(sb);
