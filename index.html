@@ -1,4 +1,4 @@
-<!DOCTYPE html><!-- Traxify v1.0 — Step 4: Full App -->
+<!DOCTYPE html><!-- Traxify v1.0 — Step 4 exact InvTrack port -->
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -7,6 +7,9 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="Traxify" />
+  <meta name="application-name" content="Traxify" />
+  <link rel="manifest" href="./manifest.json" />
+  <link rel="apple-touch-icon" href="./icon-192.png" />
   <title>Traxify</title>
   <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
@@ -15,7 +18,6 @@
     import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
     import { getFirestore, collection, doc, getDocs, getDoc, setDoc, addDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
-    // ── PASTE YOUR FIREBASE CONFIG HERE ──────────────────────────────────────
     const firebaseConfig = {
       apiKey:            "AIzaSyBIB1f69foJb4Svw15T4yv8KV4uzjC66_M",
       authDomain:        "traxify-45545.firebaseapp.com",
@@ -24,381 +26,185 @@
       messagingSenderId: "341961978716",
       appId:             "1:341961978716:web:efca65de5f8a80f44e4799"
     };
-    // ─────────────────────────────────────────────────────────────────────────
+    const app2 = initializeApp(firebaseConfig);
+    const auth = getAuth(app2);
+    const db   = getFirestore(app2);
 
-    const firebaseApp = initializeApp(firebaseConfig);
-    const auth = getAuth(firebaseApp);
-    const db   = getFirestore(firebaseApp);
+    window.firebaseSignIn  = (e,p) => signInWithEmailAndPassword(auth,e,p);
+    window.firebaseSignUp  = (e,p) => createUserWithEmailAndPassword(auth,e,p);
+    window.firebaseResetPw = (e)   => sendPasswordResetEmail(auth,e);
+    window.firebaseSignOut = ()    => signOut(auth);
+    window.onAuthChange    = (cb)  => onAuthStateChanged(auth,cb);
 
-    window._signIn  = (e,p) => signInWithEmailAndPassword(auth,e,p);
-    window._signUp  = (e,p) => createUserWithEmailAndPassword(auth,e,p);
-    window._resetPw = (e)   => sendPasswordResetEmail(auth,e);
-    window._signOut = ()    => signOut(auth);
-    window._onAuth  = (cb)  => onAuthStateChanged(auth,cb);
-
-    window._getDoc = async (path,id) => {
-      const snap = await getDoc(doc(db,path,id));
-      return snap.exists() ? {_id:snap.id,...snap.data()} : null;
-    };
-    window._setDoc    = async (path,id,data) => { await setDoc(doc(db,path,id),data); };
-    window._addDoc    = async (path,data)     => { const r=await addDoc(collection(db,path),data); return r.id; };
-    window._updateDoc = async (path,id,data)  => { await updateDoc(doc(db,path,id),data); };
-    window._getAll    = async (path)          => {
-      const snap = await getDocs(collection(db,path));
-      const res=[]; snap.forEach(d=>res.push({_id:d.id,...d.data()})); return res;
-    };
-
+    function tc(col){ return "tenants/"+window._tenantId+"/"+col; }
+    window.fsGetAll = async (col) => { const snap=await getDocs(collection(db,tc(col))); const r=[]; snap.forEach(d=>r.push({_id:d.id,...d.data()})); return r; };
+    window.fsGetOne = async (col,id) => { const snap=await getDoc(doc(db,tc(col),id)); return snap.exists()?{_id:snap.id,...snap.data()}:null; };
+    window.fsSet    = async (col,id,data) => { await setDoc(doc(db,tc(col),id),data); return true; };
+    window.fsAdd    = async (col,data)    => { const r=await addDoc(collection(db,tc(col)),data); return r.id; };
+    window.fsUpdate = async (col,id,data) => { await updateDoc(doc(db,tc(col),id),data); return true; };
+    window.fsGetUser    = async (uid)  => { const s=await getDoc(doc(db,"users",uid)); return s.exists()?{_id:s.id,...s.data()}:null; };
+    window.fsSetUser    = async (uid,d)=> { await setDoc(doc(db,"users",uid),d); };
+    window.fsGetTenant  = async (tid)  => { const s=await getDoc(doc(db,"tenants",tid)); return s.exists()?{_id:s.id,...s.data()}:null; };
+    window.fsAddTenant  = async (d)    => { const r=await addDoc(collection(db,"tenants"),d); return r.id; };
+    window.fsGetInvite  = async (code) => { const s=await getDoc(doc(db,"invites",code)); return s.exists()?{_id:s.id,...s.data()}:null; };
+    window.fsUpdateInvite = async (code,d) => { await updateDoc(doc(db,"invites",code),d); };
+    window.fsSetTenantUser  = async (tid,uid,d) => { await setDoc(doc(db,"tenants/"+tid+"/users",uid),d); };
+    window.fsSetTenantOwner = async (tid,oid,d) => { await setDoc(doc(db,"tenants/"+tid+"/owners",oid),d); };
     window._firebaseReady = true;
   </script>
   <style>
-    *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
-    :root{
-      --bg:#07090f;--surface:#0d1118;--surface2:#131c28;--border:#1e2d3d;
-      --primary:#0d9488;--primary-h:#0f766e;--primary-glow:rgba(13,148,136,.15);
-      --text:#e2e8f0;--dim:#94a3b8;--muted:#64748b;
-      --green:#22c55e;--amber:#f59e0b;--red:#ef4444;--purple:#8b5cf6;--blue:#0ea5e9;
-      --r:12px;--r-sm:8px;
-    }
-    html,body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Inter',system-ui,sans-serif;min-height:100vh;overflow-x:hidden}
+    *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;margin:0;padding:0}
+    html,body{background:#0a0f1c;color:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,"Inter",system-ui,sans-serif;min-height:100vh;overflow-x:hidden}
     input,select,button,textarea{font-family:inherit;font-size:15px}
-    input,select{background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-sm);color:var(--text);padding:11px 14px;width:100%}
-    input:focus,select:focus{outline:2px solid var(--primary);outline-offset:2px}
-    input::placeholder{color:var(--muted)}
-    button{cursor:pointer;touch-action:manipulation}
-
-    /* ── AUTH SCREENS ── */
-    .auth-screen{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px 20px 56px}
-    .auth-card{width:100%;max-width:400px}
-    .logo{display:flex;align-items:center;gap:11px;margin-bottom:32px}
-    .logo-mark{width:42px;height:42px;background:var(--primary);border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0}
-    .logo-word{font-size:26px;font-weight:800;letter-spacing:-.8px;color:var(--text)}
-    .logo-word em{font-style:normal;color:var(--primary)}
-    .a-title{font-size:22px;font-weight:700;margin-bottom:6px}
-    .a-sub{font-size:14px;color:var(--muted);margin-bottom:24px;line-height:1.55}
-    .field{margin-bottom:14px}
-    .field label{display:block;font-size:11px;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px}
-    .btn{width:100%;padding:14px;border:none;border-radius:var(--r);font-size:15px;font-weight:700;cursor:pointer;display:block;text-align:center;transition:opacity .15s,transform .1s}
-    .btn:active{transform:scale(.98)}
-    .btn:disabled{opacity:.45;cursor:not-allowed}
-    .btn+.btn{margin-top:10px}
-    .btn-primary{background:var(--primary);color:#fff}
-    .btn-primary:hover:not(:disabled){background:var(--primary-h)}
-    .btn-ghost{background:var(--surface2);color:var(--text);border:1px solid var(--border)}
-    .btn-green{background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff}
-    .btn-amber{background:var(--amber);color:#000}
-    .btn-red{background:var(--red);color:#fff}
-    .btn-purple{background:linear-gradient(135deg,#8b5cf6,#6d28d9);color:#fff}
-    .btn-blue{background:linear-gradient(135deg,#0ea5e9,#2563eb);color:#fff}
-    .link-row{text-align:center;margin-top:18px;font-size:14px;color:var(--muted)}
-    .link-row a{color:var(--primary);text-decoration:none;font-weight:600;cursor:pointer}
-    .choice-card{background:var(--surface);border:2px solid var(--border);border-radius:var(--r);padding:20px;cursor:pointer;margin-bottom:12px;transition:border-color .15s,background .15s}
-    .choice-card:hover{border-color:var(--primary);background:var(--primary-glow)}
-    .choice-icon{font-size:26px;margin-bottom:8px}
-    .choice-title{font-size:16px;font-weight:700;color:var(--text);margin-bottom:4px}
-    .choice-sub{font-size:13px;color:var(--muted);line-height:1.4}
-    .invite-banner{background:var(--primary-glow);border:1px solid var(--primary);border-radius:var(--r-sm);padding:12px 14px;margin-bottom:20px;font-size:13px;color:var(--primary);font-weight:600;line-height:1.4}
-    .spinner{width:40px;height:40px;border:3px solid var(--border);border-top-color:var(--primary);border-radius:50%;animation:spin .7s linear infinite;margin:0 auto 16px}
-    @keyframes spin{to{transform:rotate(360deg)}}
-    .pill{display:inline-block;background:var(--primary-glow);color:var(--primary);border:1px solid var(--primary);border-radius:20px;padding:4px 14px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:16px}
-
-    /* ── MAIN APP ── */
-    .page{min-height:100vh;background:var(--bg);padding-bottom:80px}
-    .topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:12px 16px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
-    .topbar-logo{display:flex;align-items:center;gap:8px}
-    .topbar-mark{width:28px;height:28px;background:var(--primary);border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:14px}
-    .topbar-name{font-size:16px;font-weight:800;letter-spacing:-.4px}
-    .topbar-name em{font-style:normal;color:var(--primary)}
-    .topbar-org{font-size:12px;color:var(--muted);font-weight:500}
-    .content{max-width:480px;margin:0 auto;padding:16px}
-    .card{background:var(--surface);border-radius:var(--r);border:1px solid var(--border);padding:14px 16px;margin-bottom:8px}
-    .label{color:var(--dim);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:6px}
+    input,select{background:#0f172a;border:1px solid #334155;border-radius:9px;color:#f1f5f9;padding:11px 14px;width:100%}
+    input:focus,select:focus{outline:2px solid #0ea5e9;outline-offset:2px}
+    button{cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:rgba(0,0,0,0)}
+    .page{min-height:100vh;background:#0a0f1c}
+    .card{background:#111827;border-radius:12px;border:1px solid #1e293b;padding:14px 16px;margin-bottom:8px}
+    .btn{border:none;border-radius:10px;color:#fff;font-weight:700;padding:13px;width:100%;font-size:15px;display:block}
+    .btn-primary{background:linear-gradient(135deg,#0ea5e9,#6366f1)}
+    .btn-green{background:linear-gradient(135deg,#22c55e,#16a34a)}
+    .btn-purple{background:linear-gradient(135deg,#6366f1,#4f46e5)}
+    .btn-orange{background:#f59e0b}.btn-dark{background:#1e293b}.btn-red{background:#dc2626}
+    .label{color:#94a3b8;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:6px}
+    .toast{position:fixed;bottom:32px;left:50%;transform:translateX(-50%);padding:13px 24px;border-radius:12px;font-weight:600;font-size:14px;z-index:9999;max-width:88vw;text-align:center;box-shadow:0 4px 24px rgba(0,0,0,.5);white-space:nowrap}
+    .overlay{position:fixed;inset:0;background:rgba(0,0,0,.85);display:flex;align-items:flex-end;justify-content:center;z-index:500;-webkit-overflow-scrolling:touch}
+    .overlay-inner{width:100%;max-width:480px;background:#111827;border-radius:20px 20px 0 0;padding:24px 20px 48px;border:1px solid #1e293b;max-height:85vh;overflow-y:auto;-webkit-overflow-scrolling:touch;position:relative;z-index:501}
+    .overlay-inner button{position:relative;z-index:502;-webkit-tap-highlight-color:rgba(0,0,0,0);touch-action:manipulation}
+    .overlay-center{position:fixed;inset:0;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;z-index:500;padding:20px}
+    .tab-btn{flex:1;padding:12px 0;border:none;background:transparent;font-size:13px;cursor:pointer;border-bottom:2px solid transparent}
+    .action-btn{flex:1;padding:12px 0;border-radius:10px;font-weight:700;font-size:12px;display:flex;flex-direction:column;align-items:center;gap:2px;border:none}
     .badge{font-size:10px;font-weight:700;padding:3px 8px;border-radius:5px}
     .mb8{margin-bottom:8px}.mb16{margin-bottom:16px}.mb20{margin-bottom:20px}
-
-    /* stat cards */
-    .stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}
-    .stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px;text-align:center}
-    .stat-num{font-size:28px;font-weight:800;line-height:1}
-    .stat-label{font-size:11px;color:var(--muted);font-weight:600;margin-top:4px;text-transform:uppercase;letter-spacing:.06em}
-
-    /* action buttons */
-    .action-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px}
-    .action-btn{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px 8px;display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;transition:border-color .15s,background .15s}
-    .action-btn:hover{border-color:var(--primary);background:var(--primary-glow)}
-    .action-btn .ab-icon{font-size:22px}
-    .action-btn .ab-label{font-size:11px;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.05em;text-align:center}
-
-    /* bottom tabs */
-    .tabbar{position:fixed;bottom:0;left:0;right:0;background:var(--surface);border-top:1px solid var(--border);display:flex;z-index:200;padding-bottom:env(safe-area-inset-bottom)}
-    .tab-btn{flex:1;padding:12px 0 10px;border:none;background:transparent;font-size:10px;font-weight:700;color:var(--muted);cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;text-transform:uppercase;letter-spacing:.05em;transition:color .15s}
-    .tab-btn.active{color:var(--primary)}
-    .tab-btn .tab-icon{font-size:20px}
-
-    /* items */
-    .item-row{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:12px 14px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;transition:border-color .15s}
-    .item-row:hover{border-color:var(--primary)}
-    .item-name{font-weight:700;font-size:14px;color:var(--text);margin-bottom:2px}
-    .item-meta{font-size:12px;color:var(--muted)}
-    .status-badge{font-size:10px;font-weight:700;padding:3px 8px;border-radius:5px;text-transform:uppercase;letter-spacing:.04em}
-    .status-active{background:rgba(34,197,94,.15);color:#22c55e}
-    .status-used{background:rgba(245,158,11,.15);color:#f59e0b}
-    .status-transit{background:rgba(139,92,246,.15);color:#8b5cf6}
-    .status-expired{background:rgba(239,68,68,.15);color:#ef4444}
-
-    /* overlay / modal */
-    .overlay{position:fixed;inset:0;background:rgba(0,0,0,.85);display:flex;align-items:flex-end;justify-content:center;z-index:500}
-    .overlay-inner{width:100%;max-width:480px;background:var(--surface);border-radius:20px 20px 0 0;padding:24px 20px 48px;border:1px solid var(--border);max-height:85vh;overflow-y:auto;position:relative}
-    .overlay-center{position:fixed;inset:0;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;z-index:500;padding:20px}
-    .modal-title{font-size:18px;font-weight:700;margin-bottom:4px}
-    .modal-sub{font-size:13px;color:var(--muted);margin-bottom:20px}
-
-    /* scanner */
-    .scan-page{position:fixed;inset:0;background:#000;z-index:1000;display:flex;flex-direction:column;align-items:center;justify-content:center}
-    .scan-video{width:100%;max-height:60vh;object-fit:cover}
-    .scan-canvas{display:none}
-    .scan-status{color:#fff;font-size:14px;font-weight:600;margin:12px 0;text-align:center;padding:0 20px}
-    .scan-hint{color:rgba(255,255,255,.6);font-size:12px;margin-bottom:12px;text-align:center}
-    .scan-manual{width:100%;max-width:340px;padding:0 20px}
-    .scan-manual input{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:#fff;border-radius:var(--r-sm);padding:12px 14px;width:100%}
-    .scan-manual input::placeholder{color:rgba(255,255,255,.4)}
-    .scan-close{position:absolute;top:16px;right:16px;background:rgba(255,255,255,.1);border:none;color:#fff;font-size:20px;border-radius:8px;padding:8px 12px;cursor:pointer}
-
-    /* toast */
-    .toast{position:fixed;bottom:96px;left:50%;transform:translateX(-50%);padding:13px 24px;border-radius:12px;font-weight:600;font-size:14px;z-index:9999;max-width:88vw;text-align:center;box-shadow:0 4px 24px rgba(0,0,0,.5);white-space:nowrap;pointer-events:none}
-
-    /* full-page modal */
-    .full-page{position:fixed;inset:0;background:var(--bg);z-index:1000;overflow-y:auto}
-    .full-inner{max-width:480px;margin:0 auto;padding:24px 20px}
-
-    /* section header */
-    .section-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
-    .section-title{font-size:14px;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.06em}
-
-    /* search */
-    .search-wrap{position:relative;margin-bottom:12px}
-    .search-wrap input{padding-left:36px}
-    .search-icon{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:14px;pointer-events:none}
-
-    /* expiry alert */
-    .expiry-banner{background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.3);border-radius:var(--r);padding:12px 14px;margin-bottom:12px;display:flex;align-items:center;gap:10px;cursor:pointer}
-    .expiry-banner-text{font-size:13px;font-weight:600;color:var(--red)}
-
-    /* log */
-    .log-row{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:8px;display:flex;gap:12px;align-items:flex-start}
-
-    /* settings */
-    .settings-row{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px 16px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;cursor:pointer}
-    .settings-row:hover{border-color:var(--primary)}
-    .settings-label{font-size:14px;font-weight:600}
-    .settings-value{font-size:13px;color:var(--muted)}
-
+    .auth-screen{min-height:100vh;background:#0a0f1c;display:flex;align-items:center;justify-content:center;padding:24px}
+    .auth-card{width:100%;max-width:380px;background:#111827;border-radius:20px;padding:32px;border:1px solid #1e293b}
+    .auth-link{color:#38bdf8;text-decoration:none;font-weight:600;cursor:pointer}
+    .auth-link:hover{text-decoration:underline}
+    .choice-card{background:#0f172a;border:2px solid #1e293b;border-radius:14px;padding:20px;cursor:pointer;margin-bottom:12px;transition:border-color .15s}
+    .choice-card:hover{border-color:#6366f1}
+    @keyframes spin{to{transform:rotate(360deg)}}
     @media print{body *{visibility:hidden}#print-area,#print-area *{visibility:visible}#print-area{position:absolute;left:0;top:0;padding:20px;text-align:center}}
   </style>
 </head>
 <body>
 <div id="app"></div>
 <div id="print-area" style="display:none"></div>
-
 <script>
-// ── FIREBASE WAIT ─────────────────────────────────────────────────────────────
-async function waitForFirebase(){
-  let t=0;
-  while(!window._firebaseReady&&t<100){await new Promise(r=>setTimeout(r,100));t++;}
-  if(!window._firebaseReady)throw new Error("Firebase failed to load");
-}
-
-// ── DATE HELPER ───────────────────────────────────────────────────────────────
-function formatDate(ts){
-  if(!ts)return"";
-  try{
-    const tz=Intl.DateTimeFormat().resolvedOptions().timeZone;
-    return new Date(ts).toLocaleString("en-US",{timeZone:tz,month:"short",day:"numeric",year:"numeric",hour:"numeric",minute:"2-digit",hour12:true});
-  }catch(e){return ts;}
-}
-
-// ── TENANT-SCOPED FIRESTORE HELPERS ──────────────────────────────────────────
-function tCol(col){return`tenants/${S.profile.tenantId}/${col}`;}
-
-async function getItems()  {return window._getAll(tCol("items"));}
-async function getOwners() {return window._getAll(tCol("owners"));}
-async function getLog()    {return window._getAll(tCol("log"));}
-async function getOrders() {return window._getAll(tCol("orders"));}
-async function getTenantUsers(){return window._getAll(tCol("users"));}
-
-async function addItem(item)              {await window._setDoc(tCol("items"),item.barcode,item);}
-async function updateItem(barcode,data)   {await window._updateDoc(tCol("items"),barcode,data);}
-async function addLog(entry)              {await window._addDoc(tCol("log"),entry);}
-async function addOrder(order)            {await window._setDoc(tCol("orders"),order.id,order);}
-async function updateOrder(id,data)       {await window._updateDoc(tCol("orders"),id,data);}
-
-// ── STATE ─────────────────────────────────────────────────────────────────────
+async function fsWaitForReady(){let t=0;while(!window._firebaseReady&&t<100){await new Promise(r=>setTimeout(r,100));t++;}}
+function formatDate(ts){if(!ts)return"";try{const tz=Intl.DateTimeFormat().resolvedOptions().timeZone;return new Date(ts).toLocaleString("en-US",{timeZone:tz,month:"short",day:"numeric",year:"numeric",hour:"numeric",minute:"2-digit",hour12:true});}catch(e){return ts;}}
 const S={
-  // Auth state
-  screen:"loading",          // loading|login|signup|forgot|org-setup|create-org|join-org|app
-  user:null,                 // Firebase Auth user
-  profile:null,              // /users/{uid}
-  tenant:null,               // /tenants/{tenantId}
-  inviteCode:null,
-  inviteData:null,
-
-  // App state
-  tab:"dashboard",
-  owners:[],items:[],log:[],orders:[],tenantUsers:[],
-  loading:false,
-  toast:null,toastTimer:null,
-  inventorySearch:"",
-  selectedOwner:null,
-  modal:null,
-  scanning:false,scanMode:null,scanHint:"",
-
-  // Multi-scan
-  multiMode:false,
-  multiDetails:null,
-  multiCodes:[],
-  showMultiDetails:false,
-  showMultiScan:false,
-  showMultiConfirm:false,
-
-  // Orders
-  activeOrder:null,
-  orderItems:[],
-  showOrderItemScan:false,
-  showOrderQRScan:false,
-  showOrderSummary:false,
-  pendingOrderQR:null,
+  screen:"loading",firebaseUser:null,profile:null,tenant:null,inviteCode:null,inviteData:null,
+  showAccountMenu:false,tab:"dashboard",loading:false,toast:null,toastTimer:null,
+  scanning:false,scanMode:null,scanHint:"",inventorySearch:"",modal:null,selectedOwner:null,
+  showScanPrompt:false,owners:[],items:[],orders:[],log:[],users:[],
+  multiMode:false,multiDetails:null,multiCodes:[],
+  showMultiDetails:false,showMultiScan:false,showMultiConfirm:false,
+  activeOrder:null,showOrderGen:false,
+  orderItems:[],showOrderItemScan:false,showOrderQRScan:false,
+  showOrderSummary:false,pendingOrderQR:null,
 };
-
 function setState(u){Object.assign(S,u);render();}
-function showToast(msg,type="ok"){
-  if(S.toastTimer)clearTimeout(S.toastTimer);
-  const t=setTimeout(()=>setState({toast:null,toastTimer:null}),3500);
-  setState({toast:{msg,type},toastTimer:t});
-}
-
-// ── DATA LOAD ─────────────────────────────────────────────────────────────────
+function showToast(msg,type="ok"){if(S.toastTimer)clearTimeout(S.toastTimer);const t=setTimeout(()=>setState({toast:null,toastTimer:null}),3500);setState({toast:{msg,type},toastTimer:t});}
+function getProfile(){return S.profile||{};}
+function isAdmin(){return getProfile().role==="admin";}
 async function loadData(){
   setState({loading:true});
   try{
-    const [oR,iR,lR,ordR,uR]=await Promise.allSettled([getOwners(),getItems(),getLog(),getOrders(),getTenantUsers()]);
-    const owners = oR.status==="fulfilled"?oR.value:S.owners;
-    const items  = iR.status==="fulfilled"?iR.value:S.items;
-    const log    = lR.status==="fulfilled"?lR.value:S.log;
-    const orders = ordR.status==="fulfilled"?ordR.value:S.orders;
-    const tenantUsers = uR.status==="fulfilled"?uR.value:S.tenantUsers;
+    const [ownR,itmR,logR,usrR,ordR]=await Promise.allSettled([window.fsGetAll("owners"),window.fsGetAll("items"),window.fsGetAll("log"),window.fsGetAll("users"),window.fsGetAll("orders")]);
     setState({
-      owners:owners.map(o=>({id:o._id||o.id,name:o.name,type:o.type})),
-      items:items.map(i=>({barcode:i._id||i.barcode,name:i.name,type:i.type,expDate:i.expDate||"",ownerId:i.ownerId,status:i.status||"active",addedAt:i.addedAt,usedBy:i.usedBy||""})),
-      log:log.map(l=>({ts:l.ts,action:l.action,barcode:l.barcode,itemName:l.itemName,from:l.from,to:l.to,user:l.user})).sort((a,b)=>new Date(b.ts)-new Date(a.ts)),
-      orders:orders.map(o=>({id:o._id||o.id,name:o.name,count:o.count,createdBy:o.createdBy,createdAt:o.createdAt,status:o.status,items:o.items||""})),
-      tenantUsers:tenantUsers.map(u=>({uid:u._id,displayName:u.displayName,email:u.email,role:u.role,ownerId:u.ownerId})),
+      owners:(ownR.status==="fulfilled"?ownR.value:[]).map(o=>({id:o._id,name:o.name,type:o.type})),
+      items:(itmR.status==="fulfilled"?itmR.value:[]).map(i=>({barcode:i._id,name:i.name,type:i.type,expDate:i.expDate,ownerId:i.ownerId,status:i.status||"active",addedAt:i.addedAt,usedBy:i.usedBy||""})),
+      log:(logR.status==="fulfilled"?logR.value:[]).map(l=>({ts:l.ts,action:l.action,barcode:l.barcode,itemName:l.itemName,from:l.from,to:l.to,user:l.user})).sort((a,b)=>new Date(b.ts)-new Date(a.ts)),
+      users:(usrR.status==="fulfilled"?usrR.value:[]).map(u=>({username:u._id,displayName:u.displayName,email:u.email,role:u.role,ownerId:u.ownerId||""})),
+      orders:(ordR.status==="fulfilled"?ordR.value:[]).map(o=>({id:o._id,name:o.name,count:o.count,createdBy:o.createdBy,createdAt:o.createdAt,status:o.status,items:o.items||""})),
       loading:false
     });
   }catch(e){console.error("Load failed:",e);showToast("Could not load data","err");setState({loading:false});}
 }
-
-// ── ACTIONS ───────────────────────────────────────────────────────────────────
+async function addItem(item){await window.fsSet("items",item.barcode,item);}
+async function updateItem(b,d){await window.fsUpdate("items",b,d);}
+async function addLog(e){await window.fsAdd("log",e);}
+async function addOrder(o){await window.fsSet("orders",o.id,o);}
+async function updateOrder(id,d){await window.fsUpdate("orders",id,d);}
+async function submitUndoCheckout(item){
+  const now=new Date().toISOString();
+  const itemLog=S.log.filter(l=>l.barcode===item.barcode);
+  const ce=itemLog.find(l=>l.action==="CHECK_OUT");
+  let ro=null;
+  if(ce&&ce.from){const v=ce.from.trim().toLowerCase();ro=S.owners.find(o=>o.name.trim().toLowerCase()===v||o.id.trim().toLowerCase()===v);}
+  if(!ro)ro=S.owners.find(o=>o.id.toUpperCase()==="POOL")||S.owners[0];
+  setState({items:S.items.map(i=>i.barcode===item.barcode?{...i,status:"active",ownerId:ro.id,usedBy:""}:i)});
+  showToast("\u21a9\ufe0f "+item.name+" returned to "+ro.name);
+  updateItem(item.barcode,{status:"active",ownerId:ro.id,usedBy:""}).then(()=>addLog({ts:now,action:"UNDO_CHECKOUT",barcode:item.barcode,itemName:item.name,from:"USED",to:ro.name,user:getProfile().displayName})).catch(e=>showToast("Failed: "+e.message,"err"));
+}
 async function submitCheckin(barcode,name,type,expDate,ownerId){
   const now=new Date().toISOString();
   const ownerName=S.owners.find(o=>o.id===ownerId)?.name||ownerId;
+  const orderRef=S.activeOrder?S.activeOrder.id:"";
   const newItem={barcode,name,type,expDate,ownerId,status:"active",addedAt:now,usedBy:""};
   setState({items:[...S.items,newItem]});
   addItem(newItem);
-  addLog({ts:now,action:"CHECK_IN",barcode,itemName:name,from:S.activeOrder?S.activeOrder.id:"",to:ownerName,user:S.profile.displayName});
+  addLog({ts:now,action:"CHECK_IN",barcode,itemName:name,from:orderRef,to:ownerName,user:getProfile().displayName});
 }
-
 async function submitMultiCheckin(){
-  const {multiDetails,multiCodes,profile,owners,activeOrder}=S;
+  const{multiDetails,multiCodes,owners}=S;
   setState({loading:true,showMultiConfirm:false});
   const pool=owners.find(o=>o.id.toUpperCase()==="POOL")||owners[0];
   const now=new Date().toISOString();
   try{
     for(const barcode of multiCodes){
       await addItem({barcode,name:multiDetails.name,type:multiDetails.type,expDate:multiDetails.expDate,ownerId:pool.id,status:"active",addedAt:now,usedBy:""});
-      await addLog({ts:now,action:"CHECK_IN",barcode,itemName:multiDetails.name,from:"",to:pool.name,user:profile.displayName});
+      await addLog({ts:now,action:"CHECK_IN",barcode,itemName:multiDetails.name,from:"",to:pool.name,user:getProfile().displayName});
     }
-    showToast(`✅ ${multiCodes.length} items checked in to ${pool.name}`);
-    setState({multiMode:false,multiDetails:null,multiCodes:[],showMultiDetails:false,showMultiScan:false,showMultiConfirm:false,loading:false,scanning:false});
-  }catch(e){showToast("Multi-checkin failed: "+e.message,"err");setState({loading:false});}
+    showToast("\u2705 "+multiCodes.length+" items checked in to "+pool.name);
+    setState({multiMode:false,multiDetails:null,multiCodes:[],showMultiDetails:false,showMultiScan:false,showMultiConfirm:false,activeOrder:null,scanMode:null});
+    await loadData();
+  }catch(e){showToast("Write failed","err");setState({loading:false});}
 }
-
-async function submitCheckout(item,usedBy){
+async function submitCheckout(item){
   const now=new Date().toISOString();
   const ownerName=S.owners.find(o=>o.id===item.ownerId)?.name||item.ownerId;
-  const updatedItems=S.items.map(i=>i.barcode===item.barcode?{...i,status:"used",usedBy}:i);
-  setState({items:updatedItems});
-  showToast("📤 "+item.name+" checked out");
-  updateItem(item.barcode,{status:"used",usedBy})
-    .then(()=>addLog({ts:now,action:"CHECK_OUT",barcode:item.barcode,itemName:item.name,from:ownerName,to:usedBy,user:S.profile.displayName}))
-    .catch(e=>showToast("Failed: "+e.message,"err"));
+  const updatedItems=S.items.map(i=>i.barcode===item.barcode?{...i,status:"used",ownerId:"USED",usedBy:getProfile().displayName}:i);
+  setState({modal:null,loading:false,items:updatedItems});
+  showToast("\ud83d\udce4 "+item.name+" \u2192 Used");
+  updateItem(item.barcode,{ownerId:"USED",status:"used",usedBy:getProfile().displayName}).then(()=>addLog({ts:now,action:"CHECK_OUT",barcode:item.barcode,itemName:item.name,from:ownerName,to:"USED",user:getProfile().displayName})).catch(e=>showToast("Write failed: "+e.message,"err"));
 }
-
-async function submitUndoCheckout(item){
-  const now=new Date().toISOString();
-  const itemLog=S.log.filter(l=>l.barcode===item.barcode);
-  const checkoutEntry=itemLog.find(l=>l.action==="CHECK_OUT");
-  let returnOwner=null;
-  if(checkoutEntry&&checkoutEntry.from){
-    const fromVal=checkoutEntry.from.trim().toLowerCase();
-    returnOwner=S.owners.find(o=>o.name.trim().toLowerCase()===fromVal||o.id.trim().toLowerCase()===fromVal);
-  }
-  if(!returnOwner)returnOwner=S.owners.find(o=>o.id.toUpperCase()==="POOL")||S.owners[0];
-  const updatedItems=S.items.map(i=>i.barcode===item.barcode?{...i,status:"active",ownerId:returnOwner.id,usedBy:""}:i);
-  setState({items:updatedItems});
-  showToast("↩️ "+item.name+" returned to "+returnOwner.name);
-  updateItem(item.barcode,{status:"active",ownerId:returnOwner.id,usedBy:""})
-    .then(()=>addLog({ts:now,action:"UNDO_CHECKOUT",barcode:item.barcode,itemName:item.name,from:"USED",to:returnOwner.name,user:S.profile.displayName}))
-    .catch(e=>showToast("Failed: "+e.message,"err"));
-}
-
 async function submitTransfer(item,toOwnerId){
   const now=new Date().toISOString();
   const fromName=S.owners.find(o=>o.id===item.ownerId)?.name||item.ownerId;
   const toName=S.owners.find(o=>o.id===toOwnerId)?.name||toOwnerId;
-  const updatedItems=S.items.map(i=>i.barcode===item.barcode?{...i,ownerId:toOwnerId}:i);
-  setState({items:updatedItems});
-  showToast("🔄 "+item.name+" transferred to "+toName);
-  updateItem(item.barcode,{ownerId:toOwnerId})
-    .then(()=>addLog({ts:now,action:"TRANSFER",barcode:item.barcode,itemName:item.name,from:fromName,to:toName,user:S.profile.displayName}))
-    .catch(e=>showToast("Failed: "+e.message,"err"));
+  setState({modal:null,loading:false,items:S.items.map(i=>i.barcode===item.barcode?{...i,ownerId:toOwnerId}:i)});
+  showToast("\ud83d\udd04 "+item.name+" \u2192 "+toName);
+  updateItem(item.barcode,{ownerId:toOwnerId}).then(()=>addLog({ts:now,action:"TRANSFER",barcode:item.barcode,itemName:item.name,from:fromName,to:toName,user:getProfile().displayName})).catch(e=>console.error(e));
 }
-
-async function submitReceiveOrder(order,barcodes,toOwnerId){
+async function submitOrderCreate(orderQR,itemBarcodes,orderName){
   const now=new Date().toISOString();
-  const toOwner=S.owners.find(o=>o.id===toOwnerId)||S.owners[0];
-  setState({loading:true});
-  try{
-    for(const barcode of barcodes){
-      await updateItem(barcode,{ownerId:toOwnerId,status:"active"});
-      await addLog({ts:now,action:"ORDER_IN",barcode,itemName:S.items.find(i=>i.barcode===barcode)?.name||barcode,from:"TRANSIT",to:toOwner.name,user:S.profile.displayName});
-    }
-    await updateOrder(order.id,{status:"received"});
-    showToast(`📦 Order received — ${barcodes.length} items to ${toOwner.name}`);
-    setState({loading:false,modal:null});
-    loadData();
-  }catch(e){showToast("Failed: "+e.message,"err");setState({loading:false});}
+  const newOrder={id:orderQR,name:orderName||orderQR,count:itemBarcodes.length,createdBy:getProfile().displayName,createdAt:now,status:"transit",items:itemBarcodes.join(",")};
+  setState({loading:false,showOrderSummary:false,orderItems:[],pendingOrderQR:null,showOrderGen:false,orders:[...S.orders,newOrder],items:S.items.map(i=>itemBarcodes.includes(i.barcode)?{...i,status:"transit",ownerId:"TRANSIT"}:i)});
+  showToast("\ud83d\udce6 Order created! "+itemBarcodes.length+" items in transit");
+  try{await addOrder(newOrder);for(const b of itemBarcodes){await updateItem(b,{ownerId:"TRANSIT",status:"transit"});await addLog({ts:now,action:"ORDER_OUT",barcode:b,itemName:"",from:"",to:"TRANSIT",user:getProfile().displayName});}}catch(e){console.error(e);}
 }
-
-async function submitCreateOrder(orderName,orderItems,orderQR){
+let orderReceiveInProgress=false;
+async function submitOrderReceive(orderQR,toOwnerId){
+  if(orderReceiveInProgress)return;orderReceiveInProgress=true;
+  setState({modal:null,loading:true});
   const now=new Date().toISOString();
-  setState({loading:true});
+  const toName=S.owners.find(o=>o.id===toOwnerId)?.name||toOwnerId;
   try{
-    await addOrder({id:orderQR,name:orderName,count:orderItems.length,createdBy:S.profile.displayName,createdAt:now,status:"pending",items:orderItems.join(",")});
-    for(const barcode of orderItems){
-      await updateItem(barcode,{status:"transit"});
-      await addLog({ts:now,action:"ORDER_OUT",barcode,itemName:S.items.find(i=>i.barcode===barcode)?.name||barcode,from:S.owners.find(o=>o.id===S.items.find(i=>i.barcode===barcode)?.ownerId)?.name||"",to:"TRANSIT",user:S.profile.displayName});
-    }
-    showToast(`🚚 Order "${orderName}" created — ${orderItems.length} items in transit`);
-    setState({loading:false,showOrderSummary:false,orderItems:[],pendingOrderQR:null,showOrderItemScan:false,showOrderQRScan:false,activeOrder:null});
-    loadData();
-  }catch(e){showToast("Failed: "+e.message,"err");setState({loading:false});}
+    const orderRow=S.orders.find(o=>o.id===orderQR);
+    if(!orderRow){showToast("Order not found","err");setState({loading:false});orderReceiveInProgress=false;return;}
+    const barcodes=(orderRow.items||"").split(",").filter(b=>b.trim());
+    if(barcodes.length===0){showToast("No items in order","err");setState({loading:false});orderReceiveInProgress=false;return;}
+    for(const b of barcodes){await updateItem(b,{ownerId:toOwnerId,status:"active"});await addLog({ts:now,action:"ORDER_IN",barcode:b,itemName:"",from:"TRANSIT",to:toName,user:getProfile().displayName});}
+    await updateOrder(orderQR,{status:"received"});
+    showToast("\u2705 "+barcodes.length+" items received into "+toName);
+    await loadData();
+  }catch(e){showToast("Failed: "+e.message,"err");setState({loading:false});}finally{orderReceiveInProgress=false;}
 }
 
-// ── SCANNER ───────────────────────────────────────────────────────────────────
 let scanStream=null,scanInterval=null;
 function startScanner(){
-  const video=document.getElementById("scan-video");
-  const canvas=document.getElementById("scan-canvas");
-  const status=document.getElementById("scan-status");
+  const video=document.getElementById("scan-video"),canvas=document.getElementById("scan-canvas"),status=document.getElementById("scan-status");
   if(!video||!canvas)return;
   navigator.mediaDevices.getUserMedia({video:{facingMode:"environment",width:{ideal:1280},height:{ideal:720}}})
     .then(stream=>{
@@ -407,7 +213,7 @@ function startScanner(){
         if(status)status.textContent=S.scanHint||"Point camera at QR code";
         scanInterval=setInterval(()=>{
           if(video.readyState!==4)return;
-          const size=Math.min(video.videoWidth,video.videoHeight)*.8;
+          const size=Math.min(video.videoWidth,video.videoHeight)*0.8;
           const x=(video.videoWidth-size)/2,y=(video.videoHeight-size)/2;
           canvas.width=size;canvas.height=size;
           const ctx=canvas.getContext("2d");
@@ -416,1107 +222,598 @@ function startScanner(){
           const code=window.jsQR(img.data,img.width,img.height,{inversionAttempts:"dontInvert"});
           if(code&&code.data)handleScan(code.data);
         },150);
-      }else{if(status)status.textContent="Type code below";}
+      }else{if(status)status.textContent="Type code manually below";}
     })
     .catch(()=>{const s=document.getElementById("scan-status");if(s)s.textContent="Camera unavailable — type code below";});
 }
-function stopScanner(){
-  clearInterval(scanInterval);scanInterval=null;
-  if(scanStream){scanStream.getTracks().forEach(t=>t.stop());scanStream=null;}
-}
-
+function stopScanner(){clearInterval(scanInterval);scanInterval=null;if(scanStream){scanStream.getTracks().forEach(t=>t.stop());scanStream=null;}}
 function handleScan(barcode){
-  const {items,scanMode,activeOrder,multiCodes,showMultiScan,showOrderItemScan,showOrderQRScan}=S;
-  if(showOrderItemScan){
+  const{scanMode,activeOrder,items,multiCodes,showMultiScan}=S;
+  stopScanner();
+  if(S.showOrderItemScan){
     const item=items.find(i=>i.barcode===barcode);
     if(item){
-      if(item.status==="used"){showToast("Already used","warn");setState({scanning:true});return;}
-      if(item.status==="transit"){showToast("In transit","warn");setState({scanning:true});return;}
-      if(S.orderItems.includes(barcode)){showToast("Already added","warn");setState({scanning:true});return;}
-      const newItems=[...S.orderItems,barcode];
-      setState({orderItems:newItems,scanning:true});
-      showToast("📦 "+newItems.length+" item"+(newItems.length>1?"s":"")+" added");
-    }else{showToast("Item not found","err");setState({scanning:true});}
+      if(item.status==="used"){showToast("Item already used","warn");setState({scanning:true});return;}
+      if(item.status==="transit"){showToast("Item already in transit","warn");setState({scanning:true});return;}
+      if(S.orderItems.includes(barcode)){showToast("Already added to order","warn");setState({scanning:true});return;}
+      const newItems=[...S.orderItems,barcode];setState({orderItems:newItems,scanning:true});showToast("📦 "+newItems.length+" item"+(newItems.length>1?"s":"")+" added to order");
+    }else{showToast("Item not found — must be checked in first","err");setState({scanning:true});}
     return;
   }
-  if(showOrderQRScan){
-    if(S.orders.find(o=>o.id===barcode)){showToast("Already an order","err");setState({scanning:true});return;}
-    const existing=items.find(i=>i.barcode===barcode);
-    if(existing&&existing.status==="active"&&!S.orderItems.includes(barcode)){showToast("Belongs to an active item","warn");setState({scanning:true});return;}
-    setState({scanning:false,showOrderQRScan:false,pendingOrderQR:barcode,showOrderSummary:true});
-    return;
+  if(S.showOrderQRScan){
+    if(S.orders.find(o=>o.id===barcode)){showToast("This QR is already an order","err");setState({scanning:true});return;}
+    const existingItem=items.find(i=>i.barcode===barcode);
+    if(existingItem&&existingItem.status==="active"&&!S.orderItems.includes(barcode)){showToast("This QR belongs to an active item","warn");setState({scanning:true});return;}
+    setState({scanning:false,showOrderQRScan:false,pendingOrderQR:barcode,showOrderSummary:true});return;
   }
   if(showMultiScan){
-    if(items.find(i=>i.barcode===barcode)){showToast("Already tracked","warn");setState({scanning:true});return;}
-    if(multiCodes.includes(barcode)){showToast("Already scanned","warn");setState({scanning:true});return;}
-    const newCodes=[...multiCodes,barcode];
-    setState({multiCodes:newCodes,scanning:true});
-    showToast(`📦 Code ${newCodes.length} scanned`);
-    return;
+    if(items.find(i=>i.barcode===barcode)){showToast("Already tracked: "+barcode,"warn");setState({scanning:true});return;}
+    if(multiCodes.includes(barcode)){showToast("Already scanned this code","warn");setState({scanning:true});return;}
+    const newCodes=[...multiCodes,barcode];setState({multiCodes:newCodes,scanning:true});showToast("📦 Code "+newCodes.length+" scanned");return;
   }
   setState({scanning:false});
-  if(scanMode==="order"&&!activeOrder){
-    const order=S.orders.find(o=>o.id===barcode);
-    if(!order){showToast("Order not found","err");return;}
-    setState({activeOrder:order,scanning:true,scanHint:"Scan items to add to order"});
-    showToast(`📦 Order: ${order.name}`);
-    return;
-  }
-  if(scanMode==="order"&&activeOrder){
-    if(items.find(i=>i.barcode===barcode)){showToast("Already tracked","warn");setState({scanning:true});return;}
-    setState({modal:{type:"checkin",barcode,orderMode:true}});return;
-  }
-  if(scanMode==="checkin"){
-    if(items.find(i=>i.barcode===barcode)){showToast("Already tracked","warn");return;}
-    setState({modal:{type:"checkin",barcode,orderMode:false}});return;
-  }
-  if(scanMode==="checkout"){
-    const item=items.find(i=>i.barcode===barcode);
-    if(!item){showToast("Item not found","err");return;}
-    if(item.status==="used"){showToast("Already checked out","warn");return;}
-    if(S.profile.role!=="admin"&&item.ownerId!==S.profile.ownerId){showToast("Not in your inventory","err");return;}
-    setState({modal:{type:"checkout",item}});return;
-  }
+  if(scanMode==="order"&&!activeOrder){const order=S.orders.find(o=>o.id===barcode);if(!order){showToast("Order not found","err");return;}setState({activeOrder:order,scanning:true,scanHint:"Scan items to add to order"});showToast("📦 Order: "+order.name+" — scan items");return;}
+  if(scanMode==="order"&&activeOrder){if(items.find(i=>i.barcode===barcode)){showToast("Already tracked","warn");setState({scanning:true});return;}setState({modal:{type:"checkin",barcode,orderMode:true}});return;}
+  if(scanMode==="checkin"){if(items.find(i=>i.barcode===barcode)){showToast("Already tracked — item exists","warn");return;}setState({modal:{type:"checkin",barcode,orderMode:false}});return;}
+  if(scanMode==="checkout"){const item=items.find(i=>i.barcode===barcode);if(!item){showToast("Item not found","err");return;}if(item.status==="used"){showToast("Already checked out","warn");return;}if(!isAdmin()&&item.ownerId!==getProfile().ownerId){showToast("You can only check out items in your own inventory","err");return;}setState({modal:{type:"checkout",item}});return;}
   if(scanMode==="transfer"){
     const order=S.orders.find(o=>o.id===barcode);
-    if(order){
-      if(order.status==="received"){showToast("Already received","warn");return;}
-      const barcodes=(order.items||"").split(",").filter(b=>b.trim());
-      if(barcodes.length===0){showToast("Order has no items","warn");return;}
-      setState({modal:{type:"receive_order",order,barcodes,toOwnerId:S.profile.role==="admin"?"":S.profile.ownerId}});
-      return;
-    }
+    if(order){if(order.status==="received"){showToast("Order already received","warn");return;}const barcodes=(order.items||"").split(",").filter(b=>b.trim());if(barcodes.length===0){showToast("Order has no items","warn");return;}setState({modal:{type:"receive_order",order,barcodes,toOwnerId:isAdmin()?"":getProfile().ownerId}});return;}
     const item=items.find(i=>i.barcode===barcode);
-    if(!item){showToast("Item not found","err");return;}
-    if(item.status==="used"){showToast("Already used","warn");return;}
-    if(item.status==="transit"){showToast("In transit — receive order instead","warn");return;}
-    if(S.profile.role!=="admin"&&item.ownerId===S.profile.ownerId){showToast("Already in your inventory","warn");return;}
+    if(!item){showToast("Item not found — check in first","err");return;}
+    if(item.status==="used"){showToast("Item already used","warn");return;}
+    if(item.status==="transit"){showToast("Item is in transit — receive the order instead","warn");return;}
+    if(!isAdmin()&&item.ownerId===getProfile().ownerId){showToast("Item is already in your inventory","warn");return;}
     setState({modal:{type:"transfer",item}});
   }
 }
-
-// ── EL HELPER ─────────────────────────────────────────────────────────────────
 function el(tag,attrs={},...children){
   const e=document.createElement(tag);
   for(const[k,v]of Object.entries(attrs)){
-    if(k==="onclick")e.onclick=v;
-    else if(k==="onchange")e.onchange=v;
-    else if(k==="oninput")e.oninput=v;
-    else if(k==="onkeydown")e.onkeydown=v;
-    else if(k==="style")Object.assign(e.style,v);
-    else if(k==="class")e.className=v;
-    else e.setAttribute(k,v);
+    if(k==="onclick")e.onclick=v;else if(k==="onchange")e.onchange=v;else if(k==="oninput")e.oninput=v;else if(k==="onkeydown")e.onkeydown=v;
+    else if(k==="style")Object.assign(e.style,v);else if(k==="class")e.className=v;else e.setAttribute(k,v);
   }
-  for(const c of children){
-    if(c==null)continue;
-    if(typeof c==="string"||typeof c==="number")e.appendChild(document.createTextNode(c));
-    else e.appendChild(c);
-  }
+  for(const c of children){if(c==null)continue;if(typeof c==="string"||typeof c==="number")e.appendChild(document.createTextNode(c));else e.appendChild(c);}
   return e;
 }
-
-function appendHTML(parent,html){const d=document.createElement("div");d.innerHTML=html;while(d.firstChild)parent.appendChild(d.firstChild);}
-function makeScreen(){const s=document.createElement("div");s.className="auth-screen";const c=document.createElement("div");c.className="auth-card";s.appendChild(c);return{screen:s,card:c};}
-function makeLogo(small){
-  if(small){
-    const d=document.createElement("div");d.className="topbar-logo";
-    d.innerHTML=`<div class="topbar-mark">⬡</div><div class="topbar-name">Trax<em>ify</em></div>`;
-    return d;
-  }
-  const d=document.createElement("div");d.className="logo";
-  d.innerHTML=`<div class="logo-mark">⬡</div><div class="logo-word">Trax<em>ify</em></div>`;
-  return d;
-}
-
-// ── RENDER ────────────────────────────────────────────────────────────────────
 function render(){
-  if(S.scanning){renderScanPage();return;}
-  if(S.showMultiDetails){renderMultiDetails();return;}
-  if(S.showMultiScan){renderMultiScan();return;}
-  if(S.showMultiConfirm){renderMultiConfirm();return;}
-  if(S.showOrderItemScan){renderScanPage();return;}
-  if(S.showOrderQRScan){renderScanPage();return;}
-  if(S.showOrderSummary){renderOrderSummary();return;}
-
-  const app=document.getElementById("app");
-  app.innerHTML="";
-
-  const screens={
-    loading:renderLoading,login:renderLogin,signup:renderSignup,
-    forgot:renderForgot,"org-setup":renderOrgSetup,"create-org":renderCreateOrg,
-    "join-org":renderJoinOrg,app:renderApp
-  };
-  const fn=screens[S.screen];
-  if(fn)app.appendChild(fn());
-
-  // Toast
-  const old=document.getElementById("__toast");if(old)old.remove();
-  if(S.toast){
-    const bg=S.toast.type==="err"?"#7f1d1d":S.toast.type==="warn"?"#78350f":"#134e4a";
-    const t=document.createElement("div");t.id="__toast";t.className="toast";t.style.background=bg;t.textContent=S.toast.msg;
-    document.body.appendChild(t);
-  }
+  const app=document.getElementById("app");app.innerHTML="";
+  if(S.screen==="loading"){app.appendChild(renderAuthLoading());return;}
+  if(S.screen==="login"){app.appendChild(renderLogin());if(S.toast)app.appendChild(renderToast());return;}
+  if(S.screen==="signup"){app.appendChild(renderSignup());if(S.toast)app.appendChild(renderToast());return;}
+  if(S.screen==="forgot"){app.appendChild(renderForgot());if(S.toast)app.appendChild(renderToast());return;}
+  if(S.screen==="org-setup"){app.appendChild(renderOrgSetup());if(S.toast)app.appendChild(renderToast());return;}
+  if(S.screen==="create-org"){app.appendChild(renderCreateOrg());if(S.toast)app.appendChild(renderToast());return;}
+  if(S.screen==="join-org"){app.appendChild(renderJoinOrg());if(S.toast)app.appendChild(renderToast());return;}
+  app.appendChild(renderApp());
+  if(S.scanning){app.appendChild(renderScanner());setTimeout(startScanner,100);}
+  if(S.showScanPrompt)app.appendChild(renderScanPrompt());
+  if(S.showMultiDetails)app.appendChild(renderMultiDetails());
+  if(S.showMultiScan)app.appendChild(renderMultiScan());
+  if(S.showMultiConfirm)app.appendChild(renderMultiConfirm());
+  if(S.showOrderGen)app.appendChild(renderOrderGen());
+  if(S.showOrderSummary)app.appendChild(renderOrderSummary());
+  if(S.modal)app.appendChild(renderModal());
+  if(S.toast)app.appendChild(renderToast());
 }
-
-// ── AUTH SCREENS ──────────────────────────────────────────────────────────────
-function renderLoading(){
-  const{screen,card}=makeScreen();card.style.textAlign="center";card.appendChild(makeLogo());
-  appendHTML(card,`<div class="spinner"></div><div style="color:var(--muted);font-size:14px">Loading…</div>`);
-  return screen;
+function renderAuthLoading(){
+  const d=el("div",{style:{minHeight:"100vh",background:"#0a0f1c",display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:"16px"}});
+  const sp=el("div",{style:{width:"40px",height:"40px",border:"3px solid #1e293b",borderTopColor:"#0ea5e9",borderRadius:"50%",animation:"spin .7s linear infinite"}});
+  d.appendChild(sp);d.appendChild(el("div",{style:{color:"#475569",fontSize:"14px"}},"Loading…"));return d;
 }
-
 function renderLogin(){
-  const{screen,card}=makeScreen();card.appendChild(makeLogo());
-  if(S.inviteData){const b=document.createElement("div");b.className="invite-banner";b.textContent=`✉️ You've been invited to join ${S.inviteData.tenantName||"an organization"}.`;card.appendChild(b);}
-  appendHTML(card,`
-    <div class="a-title">Welcome back</div>
-    <div class="a-sub">Sign in to your Traxify account</div>
-    <div class="field"><label>Email</label><input id="li-email" type="email" placeholder="you@company.com" autocomplete="email"/></div>
-    <div class="field"><label>Password</label><input id="li-pw" type="password" placeholder="••••••••" autocomplete="current-password"/></div>
-  `);
-  const btn=document.createElement("button");btn.className="btn btn-primary";btn.textContent="Sign In";card.appendChild(btn);
-  appendHTML(card,`<div class="link-row" style="margin-top:14px"><a id="li-forgot">Forgot password?</a></div><div class="link-row">No account? <a id="li-signup">Create one</a></div>`);
+  let email="",password="",showPass=false;
+  const wrap=el("div",{class:"auth-screen"});
+  const card=el("div",{class:"auth-card"});
+  const icon=el("div",{style:{textAlign:"center",marginBottom:"28px"}});
+  icon.innerHTML='<div style="font-size:48px;margin-bottom:10px">&#x2B21;</div><h1 style="font-weight:800;font-size:26px;background:linear-gradient(90deg,#38bdf8,#818cf8);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin:0">Traxify</h1><p style="color:#475569;font-size:14px;margin:8px 0 0">Sign in to your inventory</p>';
+  card.appendChild(icon);
+  if(S.inviteData){const b=el("div",{style:{background:"#0ea5e918",border:"1px solid #0ea5e933",borderRadius:"9px",padding:"10px 14px",marginBottom:"16px",color:"#38bdf8",fontSize:"13px",fontWeight:"600"}});b.textContent="✉️ Invited to join "+(S.inviteData.tenantName||"an organization");card.appendChild(b);}
+  const eLabel=el("label",{class:"label"},"Email");
+  const eInput=el("input",{type:"email",placeholder:"Enter your email"});
+  eInput.oninput=e=>email=e.target.value;eInput.onkeydown=e=>{if(e.key==="Enter")doLogin();};
+  card.appendChild(eLabel);card.appendChild(eInput);card.appendChild(el("div",{style:{height:"16px"}}));
+  const pLabel=el("label",{class:"label"},"Password");
+  const pWrap=el("div",{style:{position:"relative"}});
+  const pInput=el("input",{type:"password",placeholder:"Enter password",style:{paddingRight:"48px"}});
+  pInput.oninput=e=>password=e.target.value;pInput.onkeydown=e=>{if(e.key==="Enter")doLogin();};
+  const eyeBtn=el("button",{style:{position:"absolute",right:"14px",top:"50%",transform:"translateY(-50%)",background:"none",border:"none",color:"#475569",fontSize:"18px",padding:"0"}},"👁");
+  eyeBtn.onclick=()=>{showPass=!showPass;pInput.type=showPass?"text":"password";eyeBtn.textContent=showPass?"🙈":"👁";};
+  pWrap.appendChild(pInput);pWrap.appendChild(eyeBtn);
+  card.appendChild(pLabel);card.appendChild(pWrap);
+  const errDiv=el("div",{style:{minHeight:"28px"}});card.appendChild(errDiv);
+  const loginBtn=el("button",{class:"btn btn-primary",style:{marginTop:"8px"}},"Sign In →");
+  loginBtn.onclick=doLogin;card.appendChild(loginBtn);
+  const links=el("div",{style:{marginTop:"16px",textAlign:"center",display:"flex",flexDirection:"column",gap:"8px"}});
+  const fl=el("a",{class:"auth-link",style:{fontSize:"13px"}},"Forgot password?");fl.onclick=()=>setState({screen:"forgot"});
+  const sl=el("div",{style:{color:"#64748b",fontSize:"13px"}});sl.innerHTML='New to Traxify? <a class="auth-link">Create an account</a>';sl.querySelector("a").onclick=()=>setState({screen:"signup"});
+  links.appendChild(fl);links.appendChild(sl);card.appendChild(links);
   async function doLogin(){
-    const email=document.getElementById("li-email")?.value.trim();const pw=document.getElementById("li-pw")?.value;
-    if(!email||!pw){showToast("Please fill in all fields","warn");return;}
-    btn.disabled=true;btn.textContent="Signing in…";
-    try{await window._signIn(email,pw);}
-    catch(e){showToast(friendlyError(e.code),"err");btn.disabled=false;btn.textContent="Sign In";}
+    if(!email||!password){errDiv.innerHTML='<p style="color:#f87171;font-size:13px;text-align:center;margin:8px 0 0">⚠ Enter email and password</p>';return;}
+    loginBtn.textContent="Signing in…";loginBtn.disabled=true;
+    try{await window.firebaseSignIn(email,password);}
+    catch(err){
+      let msg="Incorrect email or password";
+      if(err.code==="auth/user-not-found")msg="No account found with this email";
+      if(err.code==="auth/wrong-password"||err.code==="auth/invalid-credential")msg="Incorrect email or password";
+      if(err.code==="auth/invalid-email")msg="Invalid email address";
+      if(err.code==="auth/too-many-requests")msg="Too many attempts — try again later";
+      errDiv.innerHTML='<p style="color:#f87171;font-size:13px;text-align:center;margin:8px 0 0">⚠ '+msg+'</p>';
+      loginBtn.textContent="Sign In →";loginBtn.disabled=false;
+    }
   }
-  btn.addEventListener("click",doLogin);
-  setTimeout(()=>{
-    document.getElementById("li-pw")?.addEventListener("keydown",e=>{if(e.key==="Enter")doLogin();});
-    document.getElementById("li-forgot")?.addEventListener("click",()=>setState({screen:"forgot"}));
-    document.getElementById("li-signup")?.addEventListener("click",()=>setState({screen:"signup"}));
-  },0);
-  return screen;
+  wrap.appendChild(card);return wrap;
 }
-
 function renderSignup(){
-  const{screen,card}=makeScreen();card.appendChild(makeLogo());
-  if(S.inviteData){const b=document.createElement("div");b.className="invite-banner";b.textContent=`✉️ You've been invited to join ${S.inviteData.tenantName||"an organization"}.`;card.appendChild(b);}
-  appendHTML(card,`
-    <div class="a-title">Create your account</div>
-    <div class="a-sub">${S.inviteData?"Create an account to accept your invitation.":"Start tracking inventory with your team."}</div>
-    <div class="field"><label>Your Name</label><input id="su-name" type="text" placeholder="Jane Smith" autocomplete="name"/></div>
-    <div class="field"><label>Email</label><input id="su-email" type="email" placeholder="you@company.com" autocomplete="email"/></div>
-    <div class="field"><label>Password</label><input id="su-pw" type="password" placeholder="Min 6 characters" autocomplete="new-password"/></div>
-    <div class="field"><label>Confirm Password</label><input id="su-pw2" type="password" placeholder="Repeat password" autocomplete="new-password"/></div>
-  `);
-  const btn=document.createElement("button");btn.className="btn btn-primary";btn.textContent="Create Account";card.appendChild(btn);
-  appendHTML(card,`<div class="link-row">Already have an account? <a id="su-login">Sign in</a></div>`);
-  async function doSignup(){
-    const name=document.getElementById("su-name")?.value.trim();const email=document.getElementById("su-email")?.value.trim();
-    const pw=document.getElementById("su-pw")?.value;const pw2=document.getElementById("su-pw2")?.value;
-    if(!name||!email||!pw||!pw2){showToast("Please fill in all fields","warn");return;}
-    if(pw!==pw2){showToast("Passwords do not match","err");return;}
-    if(pw.length<6){showToast("Password must be at least 6 characters","warn");return;}
+  const wrap=el("div",{class:"auth-screen"});const card=el("div",{class:"auth-card"});
+  card.innerHTML='<div style="text-align:center;margin-bottom:24px"><div style="font-size:40px">&#x2B21;</div><h1 style="font-weight:800;font-size:22px;background:linear-gradient(90deg,#38bdf8,#818cf8);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin:4px 0 0">Traxify</h1></div>';
+  if(S.inviteData){const b=el("div",{style:{background:"#0ea5e918",border:"1px solid #0ea5e933",borderRadius:"9px",padding:"10px 14px",marginBottom:"16px",color:"#38bdf8",fontSize:"13px",fontWeight:"600"}});b.textContent="✉️ Invited to join "+(S.inviteData.tenantName||"an organization");card.appendChild(b);}
+  card.appendChild(el("h2",{style:{color:"#f1f5f9",fontWeight:"800",fontSize:"22px",margin:"0 0 6px"}},"Create your account"));
+  card.appendChild(el("p",{style:{color:"#475569",fontSize:"14px",margin:"0 0 24px"}},S.inviteData?"Create an account to accept your invitation.":"Start tracking inventory with your team."));
+  [["su-name","Your Name","text","Jane Smith"],["su-email","Email","email","you@company.com"],["su-pw","Password","password","Min 6 characters"],["su-pw2","Confirm Password","password","Repeat password"]].forEach(([id,label,type,ph])=>{
+    const f=el("div",{style:{marginBottom:"16px"}});f.appendChild(el("label",{class:"label"},label));f.appendChild(el("input",{id,type,placeholder:ph}));card.appendChild(f);
+  });
+  const errDiv=el("div",{style:{minHeight:"24px"}});card.appendChild(errDiv);
+  const btn=el("button",{class:"btn btn-primary"},"Create Account");
+  btn.onclick=async()=>{
+    const name=document.getElementById("su-name")?.value.trim(),email=document.getElementById("su-email")?.value.trim(),pw=document.getElementById("su-pw")?.value,pw2=document.getElementById("su-pw2")?.value;
+    if(!name||!email||!pw||!pw2){errDiv.innerHTML='<p style="color:#f87171;font-size:13px;text-align:center">⚠ Fill in all fields</p>';return;}
+    if(pw!==pw2){errDiv.innerHTML='<p style="color:#f87171;font-size:13px;text-align:center">⚠ Passwords do not match</p>';return;}
+    if(pw.length<6){errDiv.innerHTML='<p style="color:#f87171;font-size:13px;text-align:center">⚠ Password must be 6+ characters</p>';return;}
     btn.disabled=true;btn.textContent="Creating account…";
-    try{
-      const cred=await window._signUp(email,pw);
-      await window._setDoc("users",cred.user.uid,{displayName:name,email,tenantId:null,role:null,ownerId:null,createdAt:new Date().toISOString()});
-    }catch(e){showToast(friendlyError(e.code),"err");btn.disabled=false;btn.textContent="Create Account";}
-  }
-  btn.addEventListener("click",doSignup);
-  setTimeout(()=>{
-    document.getElementById("su-login")?.addEventListener("click",()=>setState({screen:"login"}));
-    document.getElementById("su-pw2")?.addEventListener("keydown",e=>{if(e.key==="Enter")doSignup();});
-  },0);
-  return screen;
+    try{const cred=await window.firebaseSignUp(email,pw);await window.fsSetUser(cred.user.uid,{displayName:name,email,tenantId:null,role:null,ownerId:null,createdAt:new Date().toISOString()});}
+    catch(e){let msg="Something went wrong";if(e.code==="auth/email-already-in-use")msg="An account with this email already exists";errDiv.innerHTML='<p style="color:#f87171;font-size:13px;text-align:center">⚠ '+msg+'</p>';btn.disabled=false;btn.textContent="Create Account";}
+  };
+  card.appendChild(btn);
+  const lnk=el("div",{style:{marginTop:"16px",textAlign:"center",color:"#64748b",fontSize:"13px"}});lnk.innerHTML='Already have an account? <a class="auth-link">Sign in</a>';lnk.querySelector("a").onclick=()=>setState({screen:"login"});card.appendChild(lnk);
+  wrap.appendChild(card);return wrap;
 }
-
 function renderForgot(){
-  const{screen,card}=makeScreen();card.appendChild(makeLogo());
-  appendHTML(card,`
-    <div class="a-title">Reset your password</div>
-    <div class="a-sub">Enter your email and we'll send a reset link.</div>
-    <div class="field"><label>Email</label><input id="fp-email" type="email" placeholder="you@company.com" autocomplete="email"/></div>
-  `);
-  const btn=document.createElement("button");btn.className="btn btn-primary";btn.textContent="Send Reset Link";card.appendChild(btn);
-  appendHTML(card,`<div class="link-row"><a id="fp-back">← Back to sign in</a></div>`);
-  async function doReset(){
-    const email=document.getElementById("fp-email")?.value.trim();
-    if(!email){showToast("Please enter your email","warn");return;}
-    btn.disabled=true;btn.textContent="Sending…";
-    try{await window._resetPw(email);showToast("✅ Reset link sent — check your email");setState({screen:"login"});}
-    catch(e){showToast(friendlyError(e.code),"err");btn.disabled=false;btn.textContent="Send Reset Link";}
-  }
-  btn.addEventListener("click",doReset);
-  setTimeout(()=>{
-    document.getElementById("fp-email")?.addEventListener("keydown",e=>{if(e.key==="Enter")doReset();});
-    document.getElementById("fp-back")?.addEventListener("click",()=>setState({screen:"login"}));
-  },0);
-  return screen;
+  const wrap=el("div",{class:"auth-screen"});const card=el("div",{class:"auth-card"});
+  card.innerHTML='<div style="text-align:center;margin-bottom:24px"><div style="font-size:40px">&#x2B21;</div></div>';
+  card.appendChild(el("h2",{style:{color:"#f1f5f9",fontWeight:"800",fontSize:"22px",margin:"0 0 6px"}},"Reset your password"));
+  card.appendChild(el("p",{style:{color:"#475569",fontSize:"14px",margin:"0 0 24px"}},"Enter your email and we'll send you a reset link."));
+  const f=el("div",{style:{marginBottom:"16px"}});f.appendChild(el("label",{class:"label"},"Email"));const inp=el("input",{id:"fp-email",type:"email",placeholder:"you@company.com"});f.appendChild(inp);card.appendChild(f);
+  const errDiv=el("div",{style:{minHeight:"24px"}});card.appendChild(errDiv);
+  const btn=el("button",{class:"btn btn-primary"},"Send Reset Link");
+  btn.onclick=async()=>{const email=document.getElementById("fp-email")?.value.trim();if(!email){errDiv.innerHTML='<p style="color:#f87171;font-size:13px;text-align:center">⚠ Enter your email</p>';return;}btn.disabled=true;btn.textContent="Sending…";try{await window.firebaseResetPw(email);showToast("✅ Reset link sent — check your email");setState({screen:"login"});}catch(e){errDiv.innerHTML='<p style="color:#f87171;font-size:13px;text-align:center">⚠ '+e.message+'</p>';btn.disabled=false;btn.textContent="Send Reset Link";}};
+  card.appendChild(btn);
+  const lnk=el("div",{style:{marginTop:"16px",textAlign:"center"}});lnk.innerHTML='<a class="auth-link" style="font-size:13px">← Back to sign in</a>';lnk.querySelector("a").onclick=()=>setState({screen:"login"});card.appendChild(lnk);
+  wrap.appendChild(card);return wrap;
 }
-
 function renderOrgSetup(){
-  const{screen,card}=makeScreen();card.appendChild(makeLogo());
-  appendHTML(card,`<div class="a-title">Set up your workspace</div><div class="a-sub">Create a new organization for your team, or join one you were invited to.</div>`);
-  function choiceCard(icon,title,sub,onClick){
-    const c=document.createElement("div");c.className="choice-card";
-    c.innerHTML=`<div class="choice-icon">${icon}</div><div class="choice-title">${title}</div><div class="choice-sub">${sub}</div>`;
-    c.addEventListener("click",onClick);return c;
-  }
-  card.appendChild(choiceCard("🏢","Create a new organization","You'll be the admin. Invite your team after setup.",()=>setState({screen:"create-org"})));
-  card.appendChild(choiceCard("🔗","Join with an invite link","Paste the invite link your admin sent you.",()=>setState({screen:"join-org"})));
-  appendHTML(card,`<div class="link-row"><a id="os-out">Sign out</a></div>`);
-  setTimeout(()=>{document.getElementById("os-out")?.addEventListener("click",()=>{window._signOut();setState({screen:"login",user:null,profile:null,tenant:null});});},0);
-  return screen;
+  const wrap=el("div",{class:"auth-screen"});const card=el("div",{class:"auth-card"});
+  card.innerHTML='<div style="text-align:center;margin-bottom:24px"><div style="font-size:40px">&#x2B21;</div><h1 style="font-weight:800;font-size:22px;background:linear-gradient(90deg,#38bdf8,#818cf8);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin:4px 0 0">Traxify</h1></div>';
+  card.appendChild(el("h2",{style:{color:"#f1f5f9",fontWeight:"800",fontSize:"20px",margin:"0 0 6px"}},"Set up your workspace"));
+  card.appendChild(el("p",{style:{color:"#475569",fontSize:"14px",margin:"0 0 24px"}},"Create a new organization or join one you were invited to."));
+  function makeChoice(icon,title,sub,onClick){const c=el("div",{class:"choice-card"});c.innerHTML='<div style="font-size:26px;margin-bottom:8px">'+icon+'</div><div style="font-weight:700;color:#f1f5f9;font-size:15px;margin-bottom:4px">'+title+'</div><div style="font-size:13px;color:#64748b;line-height:1.4">'+sub+'</div>';c.onclick=onClick;return c;}
+  card.appendChild(makeChoice("🏢","Create a new organization","You'll be the admin. Invite your team after setup.",()=>setState({screen:"create-org"})));
+  card.appendChild(makeChoice("🔗","Join with an invite link","Paste the invite link your admin sent you.",()=>setState({screen:"join-org"})));
+  const out=el("div",{style:{marginTop:"8px",textAlign:"center"}});out.innerHTML='<a class="auth-link" style="font-size:13px">Sign out</a>';out.querySelector("a").onclick=()=>{window.firebaseSignOut();setState({screen:"login",firebaseUser:null,profile:null,tenant:null});};card.appendChild(out);
+  wrap.appendChild(card);return wrap;
 }
-
 function renderCreateOrg(){
-  const{screen,card}=makeScreen();card.appendChild(makeLogo());
-  appendHTML(card,`
-    <div class="a-title">Name your organization</div>
-    <div class="a-sub">This is what your team sees. You can change it later.</div>
-    <div class="field"><label>Organization Name</label><input id="co-name" type="text" placeholder="e.g. Acme Corp, City Hospital…"/></div>
-  `);
-  const btn=document.createElement("button");btn.className="btn btn-primary";btn.textContent="Create Organization";card.appendChild(btn);
-  appendHTML(card,`<div class="link-row"><a id="co-back">← Back</a></div>`);
-  async function doCreate(){
+  const wrap=el("div",{class:"auth-screen"});const card=el("div",{class:"auth-card"});
+  card.innerHTML='<div style="text-align:center;margin-bottom:24px"><div style="font-size:40px">🏢</div></div>';
+  card.appendChild(el("h2",{style:{color:"#f1f5f9",fontWeight:"800",fontSize:"20px",margin:"0 0 6px"}},"Name your organization"));
+  card.appendChild(el("p",{style:{color:"#475569",fontSize:"14px",margin:"0 0 24px"}},"This is what your team will see. You can change it later."));
+  const f=el("div",{style:{marginBottom:"16px"}});f.appendChild(el("label",{class:"label"},"Organization Name"));const inp=el("input",{id:"co-name",type:"text",placeholder:"e.g. Acme Supplies, City Hospital…"});f.appendChild(inp);card.appendChild(f);
+  const errDiv=el("div",{style:{minHeight:"24px"}});card.appendChild(errDiv);
+  const btn=el("button",{class:"btn btn-primary"},"Create Organization");
+  btn.onclick=async()=>{
     const name=document.getElementById("co-name")?.value.trim();
-    if(!name){showToast("Please enter an organization name","warn");return;}
+    if(!name){errDiv.innerHTML='<p style="color:#f87171;font-size:13px;text-align:center">⚠ Please enter a name</p>';return;}
     btn.disabled=true;btn.textContent="Creating…";
     try{
-      const uid=S.user.uid;const now=new Date().toISOString();
-      const tenantId=await window._addDoc("tenants",{name,createdBy:uid,createdAt:now,plan:"free"});
+      const uid=S.firebaseUser.uid,now=new Date().toISOString();
+      const tenantId=await window.fsAddTenant({name,createdBy:uid,createdAt:now,plan:"free"});
+      window._tenantId=tenantId;
       const profile={displayName:S.profile.displayName,email:S.profile.email,tenantId,role:"admin",ownerId:"POOL",createdAt:S.profile.createdAt};
-      await window._setDoc("users",uid,profile);
-      await window._setDoc(`tenants/${tenantId}/owners`,"POOL",{name:"Pool",type:"pool"});
-      await window._setDoc(`tenants/${tenantId}/users`,uid,{displayName:S.profile.displayName,email:S.profile.email,role:"admin",ownerId:"POOL",addedAt:now});
-      const tenant={_id:tenantId,name,createdBy:uid,createdAt:now,plan:"free"};
-      setState({profile,tenant,screen:"app"});
-      showToast("✅ Organization created!");
-      loadData();
-    }catch(e){console.error(e);showToast("Something went wrong: "+e.message,"err");btn.disabled=false;btn.textContent="Create Organization";}
-  }
-  btn.addEventListener("click",doCreate);
-  setTimeout(()=>{
-    document.getElementById("co-name")?.addEventListener("keydown",e=>{if(e.key==="Enter")doCreate();});
-    document.getElementById("co-back")?.addEventListener("click",()=>setState({screen:"org-setup"}));
-  },0);
-  return screen;
+      await window.fsSetUser(uid,profile);
+      await window.fsSetTenantOwner(tenantId,"POOL",{name:"Pool",type:"pool"});
+      await window.fsSetTenantUser(tenantId,uid,{displayName:S.profile.displayName,email:S.profile.email,role:"admin",ownerId:"POOL",addedAt:now});
+      setState({profile,tenant:{_id:tenantId,name},screen:"app"});showToast("✅ Organization created!");loadData();
+    }catch(e){errDiv.innerHTML='<p style="color:#f87171;font-size:13px;text-align:center">⚠ '+e.message+'</p>';btn.disabled=false;btn.textContent="Create Organization";}
+  };
+  card.appendChild(btn);
+  const back=el("div",{style:{marginTop:"12px",textAlign:"center"}});back.innerHTML='<a class="auth-link" style="font-size:13px">← Back</a>';back.querySelector("a").onclick=()=>setState({screen:"org-setup"});card.appendChild(back);
+  wrap.appendChild(card);return wrap;
 }
-
 function renderJoinOrg(){
-  const{screen,card}=makeScreen();card.appendChild(makeLogo());
-  appendHTML(card,`
-    <div class="a-title">Join an organization</div>
-    <div class="a-sub">Paste the full invite link your admin sent you.</div>
-    <div class="field"><label>Invite Link</label><input id="jo-link" type="text" placeholder="Paste invite link here…" autocomplete="off"/></div>
-  `);
-  if(S.inviteCode)setTimeout(()=>{const i=document.getElementById("jo-link");if(i)i.value=window.location.href;},30);
-  const btn=document.createElement("button");btn.className="btn btn-primary";btn.textContent="Join Organization";card.appendChild(btn);
-  appendHTML(card,`<div class="link-row"><a id="jo-back">← Back</a></div>`);
-  async function doJoin(){
-    const raw=document.getElementById("jo-link")?.value.trim();
-    if(!raw){showToast("Please paste your invite link","warn");return;}
-    let code=raw;try{const url=new URL(raw);code=url.searchParams.get("invite")||raw;}catch{}
+  const wrap=el("div",{class:"auth-screen"});const card=el("div",{class:"auth-card"});
+  card.innerHTML='<div style="text-align:center;margin-bottom:24px"><div style="font-size:40px">🔗</div></div>';
+  card.appendChild(el("h2",{style:{color:"#f1f5f9",fontWeight:"800",fontSize:"20px",margin:"0 0 6px"}},"Join an organization"));
+  card.appendChild(el("p",{style:{color:"#475569",fontSize:"14px",margin:"0 0 24px"}},"Paste the invite link your admin sent you."));
+  const f=el("div",{style:{marginBottom:"16px"}});f.appendChild(el("label",{class:"label"},"Invite Link"));const inp=el("input",{id:"jo-link",type:"text",placeholder:"Paste invite link here…"});if(S.inviteCode)setTimeout(()=>{const i=document.getElementById("jo-link");if(i)i.value=window.location.href;},30);f.appendChild(inp);card.appendChild(f);
+  const errDiv=el("div",{style:{minHeight:"24px"}});card.appendChild(errDiv);
+  const btn=el("button",{class:"btn btn-primary"},"Join Organization");
+  btn.onclick=async()=>{
+    const raw=document.getElementById("jo-link")?.value.trim();if(!raw){errDiv.innerHTML='<p style="color:#f87171;font-size:13px;text-align:center">⚠ Paste your invite link</p>';return;}
+    let code=raw;try{const u=new URL(raw);code=u.searchParams.get("invite")||raw;}catch{}
     btn.disabled=true;btn.textContent="Joining…";
     try{
-      const invite=await window._getDoc("invites",code);
-      if(!invite){showToast("Invite not found","err");btn.disabled=false;btn.textContent="Join Organization";return;}
-      if(invite.usedBy){showToast("Invite already used","err");btn.disabled=false;btn.textContent="Join Organization";return;}
-      if(invite.expiresAt&&new Date(invite.expiresAt)<new Date()){showToast("Invite expired","err");btn.disabled=false;btn.textContent="Join Organization";return;}
-      const uid=S.user.uid;const now=new Date().toISOString();const{tenantId,role,ownerId}=invite;
+      const invite=await window.fsGetInvite(code);
+      if(!invite){errDiv.innerHTML='<p style="color:#f87171;font-size:13px;text-align:center">⚠ Invite not found</p>';btn.disabled=false;btn.textContent="Join Organization";return;}
+      if(invite.usedBy){errDiv.innerHTML='<p style="color:#f87171;font-size:13px;text-align:center">⚠ Invite already used</p>';btn.disabled=false;btn.textContent="Join Organization";return;}
+      const uid=S.firebaseUser.uid,now=new Date().toISOString(),{tenantId,role,ownerId}=invite;
+      window._tenantId=tenantId;
       const profile={displayName:S.profile.displayName,email:S.profile.email,tenantId,role:role||"member",ownerId:ownerId||"POOL",createdAt:S.profile.createdAt};
-      await window._setDoc("users",uid,profile);
-      await window._setDoc(`tenants/${tenantId}/users`,uid,{displayName:S.profile.displayName,email:S.profile.email,role:role||"member",ownerId:ownerId||"POOL",addedAt:now});
-      await window._updateDoc("invites",code,{usedBy:uid,usedAt:now});
-      const tenant=await window._getDoc("tenants",tenantId);
-      setState({profile,tenant,screen:"app"});
-      showToast("✅ Welcome to the team!");
-      loadData();
-    }catch(e){console.error(e);showToast("Something went wrong: "+e.message,"err");btn.disabled=false;btn.textContent="Join Organization";}
-  }
-  btn.addEventListener("click",doJoin);
-  setTimeout(()=>{
-    document.getElementById("jo-back")?.addEventListener("click",()=>setState({screen:"org-setup"}));
-    document.getElementById("jo-link")?.addEventListener("keydown",e=>{if(e.key==="Enter")doJoin();});
-  },0);
-  return screen;
+      await window.fsSetUser(uid,profile);
+      await window.fsSetTenantUser(tenantId,uid,{displayName:S.profile.displayName,email:S.profile.email,role:role||"member",ownerId:ownerId||"POOL",addedAt:now});
+      await window.fsUpdateInvite(code,{usedBy:uid,usedAt:now});
+      const tenant=await window.fsGetTenant(tenantId);
+      setState({profile,tenant,screen:"app"});showToast("✅ Welcome to the team!");loadData();
+    }catch(e){errDiv.innerHTML='<p style="color:#f87171;font-size:13px;text-align:center">⚠ '+e.message+'</p>';btn.disabled=false;btn.textContent="Join Organization";}
+  };
+  card.appendChild(btn);
+  const back=el("div",{style:{marginTop:"12px",textAlign:"center"}});back.innerHTML='<a class="auth-link" style="font-size:13px">← Back</a>';back.querySelector("a").onclick=()=>setState({screen:"org-setup"});card.appendChild(back);
+  wrap.appendChild(card);return wrap;
 }
 
-// ── MAIN APP ──────────────────────────────────────────────────────────────────
 function renderApp(){
-  const page=document.createElement("div");page.className="page";
-
-  // Topbar
-  const topbar=document.createElement("div");topbar.className="topbar";
-  const logoWrap=makeLogo(true);
-  const rightSide=document.createElement("div");rightSide.style.cssText="display:flex;flex-direction:column;align-items:flex-end;gap:2px";
-  const orgSpan=document.createElement("div");orgSpan.className="topbar-org";orgSpan.textContent=S.tenant?.name||"";
-  const nameSpan=document.createElement("div");nameSpan.style.cssText="font-size:12px;color:var(--dim);font-weight:600";nameSpan.textContent=S.profile?.displayName||"";
-  rightSide.appendChild(orgSpan);rightSide.appendChild(nameSpan);
-  topbar.appendChild(logoWrap);topbar.appendChild(rightSide);
-  page.appendChild(topbar);
-
-  // Tab content
-  const content=document.createElement("div");content.className="content";
-  if(S.tab==="dashboard")renderDashboard(content);
-  else if(S.tab==="inventory")renderInventory(content);
-  else if(S.tab==="scan")renderScanMenu(content);
-  else if(S.tab==="orders")renderOrders(content);
-  else if(S.tab==="settings")renderSettings(content);
-  page.appendChild(content);
-
-  // Modals
-  if(S.modal)page.appendChild(renderModal());
-
-  // Bottom tabbar
-  const tabbar=document.createElement("div");tabbar.className="tabbar";
-  [
-    {id:"dashboard",icon:"📊",label:"Dashboard"},
-    {id:"inventory",icon:"📦",label:"Inventory"},
-    {id:"scan",icon:"📷",label:"Scan"},
-    {id:"orders",icon:"🚚",label:"Orders"},
-    {id:"settings",icon:"⚙️",label:"Settings"},
-  ].forEach(t=>{
-    const btn=document.createElement("button");
-    btn.className="tab-btn"+(S.tab===t.id?" active":"");
-    btn.innerHTML=`<span class="tab-icon">${t.icon}</span>${t.label}`;
-    btn.onclick=()=>setState({tab:t.id,modal:null});
-    tabbar.appendChild(btn);
-  });
-  page.appendChild(tabbar);
-  return page;
-}
-
-// ── DASHBOARD ─────────────────────────────────────────────────────────────────
-function renderDashboard(content){
-  const{items,owners,log,orders,profile}=S;
-  const myItems=profile.role==="admin"?items:items.filter(i=>i.ownerId===profile.ownerId);
-  const active=myItems.filter(i=>i.status==="active").length;
-  const used=myItems.filter(i=>i.status==="used").length;
-  const transit=myItems.filter(i=>i.status==="transit").length;
-  const pending=orders.filter(o=>o.status==="pending").length;
-
-  // Expiry alerts
-  const now=new Date();const soon=new Date();soon.setDate(soon.getDate()+120);
-  const expiring=myItems.filter(i=>i.expDate&&i.status==="active"&&new Date(i.expDate)<=soon&&new Date(i.expDate)>=now);
-  const expired=myItems.filter(i=>i.expDate&&new Date(i.expDate)<now&&i.status==="active");
-
-  const hdr=document.createElement("div");hdr.style.cssText="margin-bottom:16px;padding-top:4px";
-  hdr.innerHTML=`<div style="font-size:20px;font-weight:800;color:var(--text)">Dashboard</div><div style="font-size:13px;color:var(--muted)">Good to see you, ${profile.displayName?.split(" ")[0]||"there"}</div>`;
-  content.appendChild(hdr);
-
-  if(expired.length>0){
-    const banner=document.createElement("div");banner.className="expiry-banner";
-    banner.innerHTML=`<span style="font-size:20px">⚠️</span><span class="expiry-banner-text">${expired.length} item${expired.length>1?"s":""} expired</span>`;
-    banner.onclick=()=>setState({tab:"inventory",inventorySearch:"__expired__"});
-    content.appendChild(banner);
+  const{items,owners,orders,log,tab,loading,selectedOwner,activeOrder}=S;
+  const profile=getProfile(),admin=isAdmin();
+  const activeItems=items.filter(i=>i.status!=="used");
+  const usedItems=items.filter(i=>i.status==="used");
+  const visActiveItems=admin?activeItems:activeItems.filter(i=>i.ownerId===profile.ownerId);
+  const visUsedItems=admin?usedItems:usedItems.filter(i=>i.usedBy===profile.displayName);
+  const visOwners=admin?owners.filter(o=>o.id!=="USED"):owners.filter(o=>o.id===profile.ownerId);
+  const expSoon=visActiveItems.filter(i=>{if(!i.expDate)return false;const d=(new Date(i.expDate)-Date.now())/86400000;return d>=0&&d<=120;});
+  const expired=visActiveItems.filter(i=>i.expDate&&new Date(i.expDate)<new Date());
+  const wrap=el("div",{class:"page"});
+  const header=el("div",{style:{background:"#111827",borderBottom:"1px solid #1e293b",padding:"14px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",position:"sticky",top:"0",zIndex:"100"}});
+  const logo=el("div",{style:{display:"flex",alignItems:"center",gap:"10px"}});
+  logo.innerHTML='<span style="font-size:22px">&#x2B21;</span><span style="font-weight:800;font-size:18px;background:linear-gradient(90deg,#38bdf8,#818cf8);-webkit-background-clip:text;-webkit-text-fill-color:transparent">Traxify</span>';
+  const hRight=el("div",{style:{display:"flex",alignItems:"center",gap:"8px",position:"relative"}});
+  const acctBtn=el("button",{style:{background:"#1e293b",border:"1px solid #334155",borderRadius:"8px",padding:"6px 10px",cursor:"pointer",display:"flex",alignItems:"center",gap:"6px"}});
+  acctBtn.innerHTML='<div style="text-align:right"><div style="color:#f1f5f9;font-size:13px;font-weight:700">'+(profile.displayName||profile.email||"User")+'</div><div style="color:'+(admin?"#818cf8":"#38bdf8")+';font-size:10px;text-transform:uppercase;font-weight:600">'+(profile.role||"member")+'</div></div><span style="color:#64748b;font-size:10px">▾</span>';
+  acctBtn.onclick=()=>setState({showAccountMenu:!S.showAccountMenu});
+  hRight.appendChild(acctBtn);
+  if(S.showAccountMenu){
+    const menu=el("div",{style:{position:"absolute",top:"44px",right:"0",background:"#1e293b",border:"1px solid #334155",borderRadius:"12px",padding:"8px",zIndex:"1000",minWidth:"190px",boxShadow:"0 8px 24px rgba(0,0,0,0.5)"}});
+    const ui=el("div",{style:{padding:"10px 12px",borderRadius:"8px",background:"#0ea5e918",marginBottom:"6px"}});
+    ui.innerHTML='<div style="color:#38bdf8;font-weight:700;font-size:13px">'+(profile.displayName||profile.email)+'</div><div style="color:#64748b;font-size:10px;text-transform:uppercase;margin-top:2px">'+(profile.role)+" · "+(S.tenant?.name||"")+'</div>';
+    menu.appendChild(ui);
+    menu.appendChild(el("div",{style:{height:"1px",background:"#334155",margin:"4px 0"}}));
+    const outBtn=el("button",{style:{width:"100%",padding:"10px 12px",borderRadius:"8px",border:"none",background:"transparent",color:"#f87171",fontSize:"13px",fontWeight:"600",display:"flex",alignItems:"center",gap:"8px",cursor:"pointer"}});
+    outBtn.innerHTML="<span>⇥</span> Sign Out";
+    outBtn.onclick=()=>{stopScanner();window.firebaseSignOut();setState({screen:"login",firebaseUser:null,profile:null,tenant:null,owners:[],items:[],log:[],orders:[],users:[],showAccountMenu:false,tab:"dashboard"});};
+    menu.appendChild(outBtn);hRight.appendChild(menu);
+    setTimeout(()=>{document.addEventListener("click",function closeMenu(e){if(!acctBtn.contains(e.target)&&!menu.contains(e.target)){setState({showAccountMenu:false});document.removeEventListener("click",closeMenu);}});},0);
   }
-  if(expiring.length>0){
-    const banner=document.createElement("div");banner.className="expiry-banner";banner.style.cssText="background:rgba(245,158,11,.12);border-color:rgba(245,158,11,.3);";
-    banner.innerHTML=`<span style="font-size:20px">⏰</span><span style="font-size:13px;font-weight:600;color:var(--amber)">${expiring.length} item${expiring.length>1?"s":""} expiring within 120 days</span>`;
-    content.appendChild(banner);
+  const syncBtn=el("button",{style:{padding:"8px 10px",borderRadius:"8px",background:"#1e293b",border:"1px solid #334155",color:"#94a3b8",fontSize:"14px"}},"⟳");
+  syncBtn.onclick=loadData;hRight.appendChild(syncBtn);
+  header.appendChild(logo);header.appendChild(hRight);wrap.appendChild(header);
+  if(activeOrder){
+    const banner=el("div",{style:{background:"#1e1b4b",borderBottom:"1px solid #4338ca",padding:"10px 16px",display:"flex",alignItems:"center",justifyContent:"space-between"}});
+    banner.innerHTML='<span style="color:#818cf8;font-weight:700;font-size:13px">🗃 '+activeOrder.name+'</span>';
+    const endBtn=el("button",{style:{background:"none",border:"none",color:"#6366f1",fontSize:"13px",fontWeight:"600"}},"End");
+    endBtn.onclick=()=>setState({activeOrder:null,scanMode:null});banner.appendChild(endBtn);wrap.appendChild(banner);
   }
-
-  // Stats
-  const grid=document.createElement("div");grid.className="stat-grid";
-  [[active,"#22c55e","Active"],[used,"#f59e0b","Checked Out"],[transit,"#8b5cf6","In Transit"],[pending,"#0ea5e9","Orders"]].forEach(([num,color,label])=>{
-    const c=document.createElement("div");c.className="stat-card";
-    c.innerHTML=`<div class="stat-num" style="color:${color}">${num}</div><div class="stat-label">${label}</div>`;
-    grid.appendChild(c);
+  const actions=el("div",{style:{display:"flex",gap:"8px",padding:"12px 16px",background:"#0f172a",borderBottom:"1px solid #1e293b"}});
+  if(admin){const btn=el("button",{class:"action-btn",style:{background:"#22c55e18",border:"1px solid #22c55e33",color:"#22c55e"}});btn.innerHTML='<span style="font-size:20px">📥</span><span>Check In</span>';btn.onclick=()=>setState({scanMode:"checkin",showScanPrompt:true});actions.appendChild(btn);}
+  [["checkout","📤","Check Out","#f59e0b"],["transfer","🔄","Transfer","#6366f1"]].forEach(([mode,icon,label,color])=>{
+    const btn=el("button",{class:"action-btn",style:{background:color+"18",border:"1px solid "+color+"33",color}});
+    btn.innerHTML='<span style="font-size:20px">'+icon+'</span><span>'+label+'</span>';
+    btn.onclick=()=>setState({scanMode:mode,scanning:true,scanHint:"Point camera at QR code"});actions.appendChild(btn);
   });
-  content.appendChild(grid);
-
-  // Quick actions
-  const actHdr=document.createElement("div");actHdr.style.cssText="font-size:11px;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.06em;margin:16px 0 8px";actHdr.textContent="Quick Actions";content.appendChild(actHdr);
-  const actGrid=document.createElement("div");actGrid.className="action-grid";
-  const actions=[
-    {icon:"📥",label:"Check In",  fn:()=>setState({tab:"scan",modal:null,scanMode:"checkin",scanning:true,scanHint:"Scan to check in"})},
-    {icon:"📤",label:"Check Out", fn:()=>setState({tab:"scan",modal:null,scanMode:"checkout",scanning:true,scanHint:"Scan to check out"})},
-    {icon:"🔄",label:"Transfer",  fn:()=>setState({tab:"scan",modal:null,scanMode:"transfer",scanning:true,scanHint:"Scan to transfer"})},
-    {icon:"📦",label:"Multi-Scan",fn:()=>setState({multiMode:true,showMultiDetails:true})},
-    {icon:"🚚",label:"New Order", fn:()=>setState({tab:"orders",showOrderItemScan:true,scanning:true,scanHint:"Scan items for order",orderItems:[]})},
-    {icon:"📋",label:"Inventory", fn:()=>setState({tab:"inventory"})},
-  ];
-  actions.forEach(a=>{
-    const btn=document.createElement("div");btn.className="action-btn";
-    btn.innerHTML=`<span class="ab-icon">${a.icon}</span><span class="ab-label">${a.label}</span>`;
-    btn.onclick=a.fn;actGrid.appendChild(btn);
+  if(admin){const btn=el("button",{class:"action-btn",style:{background:"#a855f718",border:"1px solid #a855f733",color:"#c084fc"}});btn.innerHTML='<span style="font-size:20px">🗃</span><span>Order</span>';btn.onclick=()=>setState({orderItems:[],showOrderItemScan:true,showOrderQRScan:false,showOrderSummary:false,pendingOrderQR:null,scanning:true,scanHint:"Scan items to add to order"});actions.appendChild(btn);}
+  wrap.appendChild(actions);
+  const tabs=el("div",{style:{display:"flex",borderBottom:"1px solid #1e293b",background:"#111827"}});
+  [["dashboard","Dashboard"],["inventory","Inventory"],["used","Used"],["orders","Orders"],["log","Log"]].forEach(([id,label])=>{
+    const btn=el("button",{class:"tab-btn",style:{color:tab===id?"#38bdf8":"#475569",fontWeight:tab===id?"700":"500",borderBottom:tab===id?"2px solid #38bdf8":"2px solid transparent",fontSize:"12px"}},label);
+    btn.onclick=()=>setState({tab:id});tabs.appendChild(btn);
   });
-  content.appendChild(actGrid);
-
-  // Recent activity
-  if(log.length>0){
-    const logHdr=document.createElement("div");logHdr.style.cssText="font-size:11px;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.06em;margin:16px 0 8px";logHdr.textContent="Recent Activity";content.appendChild(logHdr);
-    const actionColors={CHECK_IN:"#22c55e",CHECK_OUT:"#f59e0b",TRANSFER:"#6366f1",ORDER_IN:"#0ea5e9",ORDER_OUT:"#a855f7",UNDO_CHECKOUT:"#94a3b8"};
-    const actionIcons={CHECK_IN:"📥",CHECK_OUT:"📤",TRANSFER:"🔄",ORDER_IN:"📦",ORDER_OUT:"🚚",UNDO_CHECKOUT:"↩️"};
-    log.slice(0,8).forEach(entry=>{
-      const row=document.createElement("div");row.className="log-row";
-      const icon=document.createElement("span");icon.style.cssText="font-size:18px;margin-top:2px";icon.textContent=actionIcons[entry.action]||"📋";
-      const info=document.createElement("div");info.style.flex="1";
-      const color=actionColors[entry.action]||"#94a3b8";
-      let detail="";
-      if(entry.from&&entry.to)detail=entry.from+" → "+entry.to;
-      else if(entry.to)detail="→ "+entry.to;
-      info.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center"><span style="color:${color};font-weight:700;font-size:12px">${(entry.action||"").replace(/_/g," ")}</span><span style="color:var(--muted);font-size:10px">${formatDate(entry.ts)}</span></div><div style="color:var(--text);font-size:13px;font-weight:600;margin-top:2px">${entry.itemName||entry.barcode}</div>${detail?`<div style="color:var(--dim);font-size:12px;margin-top:1px">${detail}</div>`:""}<div style="color:var(--muted);font-size:11px;margin-top:1px">by ${entry.user}</div>`;
-      row.appendChild(icon);row.appendChild(info);content.appendChild(row);
+  wrap.appendChild(tabs);
+  const content=el("div",{style:{padding:"16px",maxWidth:"480px",margin:"0 auto",paddingBottom:"32px"}});
+  if(loading)content.appendChild(el("p",{style:{textAlign:"center",color:"#475569",fontSize:"13px"}},"Loading…"));
+  if(tab==="dashboard"){
+    const welcome=el("div",{class:"card",style:{background:"linear-gradient(135deg,#0ea5e918,#6366f118)",marginBottom:"12px"}});
+    welcome.innerHTML='<p style="margin:0;color:#94a3b8;font-size:14px">Welcome, <span style="color:#f1f5f9;font-weight:700">'+(profile.displayName||profile.email)+'</span>'+(admin?'<span style="color:#818cf8;font-weight:600"> · Admin</span>':'')+'</p><p style="margin:4px 0 0;color:#475569;font-size:12px">'+(S.tenant?.name||"")+'</p>';
+    content.appendChild(welcome);
+    const stats=el("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:"8px",marginBottom:"12px"}});
+    [["Active",visActiveItems.length,"#38bdf8"],["Expiring",expSoon.length,"#f59e0b"],["Expired",expired.length,"#ef4444"],["Used",visUsedItems.length,"#94a3b8"]].forEach(([label,val,color])=>{
+      const s=el("div",{style:{background:"#111827",borderRadius:"12px",padding:"12px 6px",border:"1px solid "+color+"33",textAlign:"center"}});
+      s.innerHTML='<div style="color:'+color+';font-size:22px;font-weight:800">'+val+'</div><div style="color:#64748b;font-size:10px;margin-top:2px">'+label+'</div>';stats.appendChild(s);
+    });
+    content.appendChild(stats);
+    if(expired.length>0){const alert=el("div",{style:{background:"#450a0a",border:"1px solid #7f1d1d",borderRadius:"10px",padding:"14px",marginBottom:"8px"}});alert.innerHTML='<p style="color:#fca5a5;font-weight:700;font-size:13px;margin:0 0 8px">⚠️ Expired ('+expired.length+')</p>'+expired.map(i=>'<p style="color:#f87171;font-size:12px;margin:2px 0">• '+i.name+' — '+i.expDate+'</p>').join("");content.appendChild(alert);}
+    if(expSoon.length>0){const alert=el("div",{style:{background:"#431407",border:"1px solid #78350f",borderRadius:"10px",padding:"14px",marginBottom:"8px"}});alert.innerHTML='<p style="color:#fcd34d;font-weight:700;font-size:13px;margin:0 0 8px">⏰ Expiring Within 120 Days ('+expSoon.length+')</p>'+expSoon.map(i=>{const d=Math.ceil((new Date(i.expDate)-Date.now())/86400000);return'<p style="color:#fbbf24;font-size:12px;margin:2px 0">• '+i.name+' — '+d+'d left</p>';}).join("");content.appendChild(alert);}
+    content.appendChild(el("p",{style:{color:"#475569",fontSize:"11px",fontWeight:"600",margin:"12px 0 8px",textTransform:"uppercase",letterSpacing:".07em"}},admin?"All Inventories":"Your Inventory"));
+    visOwners.forEach(owner=>{
+      const oi=activeItems.filter(i=>i.ownerId===owner.id);const oe=oi.filter(i=>i.expDate&&new Date(i.expDate)<new Date());
+      const card=el("div",{class:"card",style:{display:"flex",alignItems:"center",justifyContent:"space-between",cursor:"pointer"}});
+      const icon=owner.id.toUpperCase()==="POOL"?"🏪":owner.type==="locker"?"🗄":"👤";
+      card.innerHTML='<div style="display:flex;align-items:center;gap:10px"><span style="font-size:22px">'+icon+'</span><div><div style="font-weight:700;color:#f1f5f9;font-size:14px">'+owner.name+'</div><div style="color:#64748b;font-size:11px">'+(owner.type||"")+'</div></div></div><div style="text-align:right"><div style="font-weight:700;color:#38bdf8;font-size:20px">'+oi.length+'</div>'+(oe.length>0?'<div style="color:#ef4444;font-size:11px">'+oe.length+' exp</div>':"")+'</div>';
+      card.onclick=()=>setState({selectedOwner:owner,tab:"inventory"});content.appendChild(card);
     });
   }
-}
-
-// ── INVENTORY ─────────────────────────────────────────────────────────────────
-function renderInventory(content){
-  const{items,owners,profile}=S;
-  const hdr=document.createElement("div");hdr.style.cssText="margin-bottom:12px;padding-top:4px";hdr.innerHTML=`<div style="font-size:20px;font-weight:800">Inventory</div>`;content.appendChild(hdr);
-
-  // Owner filter (admin sees all, member sees their own)
-  if(profile.role==="admin"&&owners.length>1){
-    const sel=document.createElement("select");sel.className="mb8";sel.style.marginBottom="12px";
-    sel.innerHTML=`<option value="">All locations</option>`+owners.map(o=>`<option value="${o.id}"${S.selectedOwner===o.id?" selected":""}>${o.name}</option>`).join("");
-    sel.onchange=()=>setState({selectedOwner:sel.value});
-    content.appendChild(sel);
-  }
-
-  // Search
-  const sw=document.createElement("div");sw.className="search-wrap";
-  sw.innerHTML=`<span class="search-icon">🔍</span><input id="inv-search" type="text" placeholder="Search items or barcodes…" value="${S.inventorySearch==="__expired__"?"":S.inventorySearch}"/>`;
-  sw.querySelector("input").oninput=e=>setState({inventorySearch:e.target.value});
-  content.appendChild(sw);
-
-  // Filter items
-  let filtered=items;
-  if(profile.role!=="admin")filtered=filtered.filter(i=>i.ownerId===profile.ownerId);
-  if(S.selectedOwner)filtered=filtered.filter(i=>i.ownerId===S.selectedOwner);
-  if(S.inventorySearch==="__expired__"){
-    filtered=filtered.filter(i=>i.expDate&&new Date(i.expDate)<new Date()&&i.status==="active");
-  }else if(S.inventorySearch){
-    const q=S.inventorySearch.toLowerCase();
-    filtered=filtered.filter(i=>(i.name||"").toLowerCase().includes(q)||(i.barcode||"").toLowerCase().includes(q)||(i.type||"").toLowerCase().includes(q));
-  }
-
-  // Count row
-  const countRow=document.createElement("div");countRow.style.cssText="font-size:12px;color:var(--muted);margin-bottom:8px";
-  countRow.textContent=`${filtered.length} item${filtered.length!==1?"s":""}`;content.appendChild(countRow);
-
-  if(filtered.length===0){
-    const empty=document.createElement("div");empty.style.cssText="text-align:center;padding:40px 0;color:var(--muted);font-size:14px";
-    empty.innerHTML=`<div style="font-size:40px;margin-bottom:12px">📦</div>${S.inventorySearch?"No items match your search":"No items yet — check some in!"}`;
-    content.appendChild(empty);return;
-  }
-
-  filtered.forEach(item=>{
-    const row=document.createElement("div");row.className="item-row";
-    const ownerName=owners.find(o=>o.id===item.ownerId)?.name||item.ownerId;
-    const statusClass={active:"status-active",used:"status-used",transit:"status-transit"}[item.status]||"status-active";
-    const isExpired=item.expDate&&new Date(item.expDate)<new Date()&&item.status==="active";
-    row.innerHTML=`
-      <div style="flex:1;min-width:0">
-        <div class="item-name">${item.name}${isExpired?` <span style="font-size:10px;color:var(--red);font-weight:700">EXPIRED</span>`:""}</div>
-        <div class="item-meta">${ownerName}${item.type?` · ${item.type}`:""}${item.expDate?` · exp ${item.expDate.substring(0,10)}`:""}${item.usedBy?` · used by ${item.usedBy}`:""}</div>
-        <div style="font-size:10px;color:var(--muted);font-family:monospace;margin-top:2px">${item.barcode}</div>
-      </div>
-      <span class="status-badge ${statusClass}">${item.status}</span>
-    `;
-    row.onclick=()=>setState({modal:{type:"item_detail",item}});
-    content.appendChild(row);
-  });
-}
-
-// ── SCAN MENU ─────────────────────────────────────────────────────────────────
-function renderScanMenu(content){
-  const hdr=document.createElement("div");hdr.style.cssText="margin-bottom:16px;padding-top:4px";hdr.innerHTML=`<div style="font-size:20px;font-weight:800">Scan</div><div style="font-size:13px;color:var(--muted)">Choose an action then point your camera at a QR code</div>`;content.appendChild(hdr);
-  const actions=[
-    {icon:"📥",label:"Check In",  sub:"Scan to add item to inventory",   fn:()=>setState({scanMode:"checkin",scanning:true,scanHint:"Scan to check in"})},
-    {icon:"📤",label:"Check Out", sub:"Scan to mark item as used",        fn:()=>setState({scanMode:"checkout",scanning:true,scanHint:"Scan to check out"})},
-    {icon:"🔄",label:"Transfer",  sub:"Scan to move item to new location",fn:()=>setState({scanMode:"transfer",scanning:true,scanHint:"Scan item or order QR"})},
-    {icon:"📦",label:"Multi-Scan",sub:"Check in multiple items at once",  fn:()=>setState({multiMode:true,showMultiDetails:true})},
-  ];
-  actions.forEach(a=>{
-    const c=document.createElement("div");c.className="choice-card";
-    c.innerHTML=`<div style="display:flex;align-items:center;gap:14px"><div style="font-size:28px">${a.icon}</div><div><div class="choice-title">${a.label}</div><div class="choice-sub">${a.sub}</div></div></div>`;
-    c.onclick=a.fn;content.appendChild(c);
-  });
-}
-
-// ── ORDERS ────────────────────────────────────────────────────────────────────
-function renderOrders(content){
-  const{orders,profile}=S;
-  const hdr=document.createElement("div");hdr.style.cssText="margin-bottom:12px;padding-top:4px;display:flex;justify-content:space-between;align-items:center";
-  hdr.innerHTML=`<div style="font-size:20px;font-weight:800">Orders</div>`;
-  if(profile.role==="admin"){
-    const newBtn=document.createElement("button");newBtn.style.cssText="background:var(--primary);color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:700;cursor:pointer";
-    newBtn.textContent="+ New Order";
-    newBtn.onclick=()=>setState({showOrderItemScan:true,scanning:true,scanHint:"Scan items for order",orderItems:[]});
-    hdr.appendChild(newBtn);
-  }
-  content.appendChild(hdr);
-
-  if(orders.length===0){
-    const empty=document.createElement("div");empty.style.cssText="text-align:center;padding:40px 0;color:var(--muted);font-size:14px";
-    empty.innerHTML=`<div style="font-size:40px;margin-bottom:12px">🚚</div>No orders yet`;
-    content.appendChild(empty);return;
-  }
-
-  orders.slice().sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt)).forEach(order=>{
-    const c=document.createElement("div");c.className="card";c.style.cursor="pointer";
-    const isPending=order.status==="pending";
-    c.innerHTML=`
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
-        <div style="font-weight:700;font-size:15px">${order.name}</div>
-        <span class="status-badge ${isPending?"status-transit":"status-active"}">${order.status}</span>
-      </div>
-      <div style="font-size:12px;color:var(--muted)">${order.count} item${order.count!==1?"s":""} · by ${order.createdBy} · ${formatDate(order.createdAt)}</div>
-      ${isPending?`<div style="font-size:12px;color:var(--purple);font-weight:600;margin-top:8px">→ Scan QR to receive</div>`:""}
-    `;
-    c.onclick=()=>{
-      if(isPending)setState({scanMode:"transfer",scanning:true,scanHint:"Scan the order QR to receive"});
-    };
-    content.appendChild(c);
-  });
-}
-
-// ── SETTINGS ──────────────────────────────────────────────────────────────────
-function renderSettings(content){
-  const{profile,tenant}=S;
-  const hdr=document.createElement("div");hdr.style.cssText="margin-bottom:16px;padding-top:4px";hdr.innerHTML=`<div style="font-size:20px;font-weight:800">Settings</div>`;content.appendChild(hdr);
-
-  // Profile
-  appendSection(content,"Account");
-  infoRow(content,"Name",profile.displayName);
-  infoRow(content,"Email",profile.email);
-  infoRow(content,"Role",profile.role==="admin"?"Admin":"Member");
-
-  // Org
-  appendSection(content,"Organization");
-  infoRow(content,"Name",tenant?.name||"—");
-  infoRow(content,"Plan",tenant?.plan||"free");
-
-  if(profile.role==="admin"){
-    // Manage users
-    const uBtn=settingsBtn("👥 Manage Team","Add, remove, or reassign team members",()=>setState({modal:{type:"manage_users"}}));
-    content.appendChild(uBtn);
-    // Add owner/location
-    const oBtn=settingsBtn("📍 Manage Locations","Add or rename inventory locations",()=>setState({modal:{type:"manage_owners"}}));
-    content.appendChild(oBtn);
-    // Invite
-    const iBtn=settingsBtn("✉️ Invite Team Member","Generate an invite link to share",()=>setState({modal:{type:"invite"}}));
-    content.appendChild(iBtn);
-  }
-
-  appendSection(content,"App");
-  infoRow(content,"Timezone","Device local time");
-  infoRow(content,"Version","Traxify v1.0");
-
-  // Sign out
-  const soBtn=document.createElement("button");soBtn.className="btn btn-ghost";soBtn.style.marginTop="20px";soBtn.textContent="Sign Out";
-  soBtn.onclick=()=>{window._signOut();setState({screen:"login",user:null,profile:null,tenant:null,owners:[],items:[],log:[],orders:[],tenantUsers:[]});};
-  content.appendChild(soBtn);
-}
-
-function appendSection(parent,title){
-  const d=document.createElement("div");d.style.cssText="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin:16px 0 6px";d.textContent=title;parent.appendChild(d);
-}
-function infoRow(parent,label,value){
-  const r=document.createElement("div");r.className="settings-row";r.style.cursor="default";
-  r.innerHTML=`<span class="settings-label">${label}</span><span class="settings-value">${value}</span>`;parent.appendChild(r);
-}
-function settingsBtn(label,sub,onClick){
-  const r=document.createElement("div");r.className="settings-row";
-  r.innerHTML=`<div><div class="settings-label">${label}</div><div class="settings-value" style="margin-top:2px">${sub}</div></div><span style="color:var(--muted)">›</span>`;
-  r.onclick=onClick;return r;
-}
-
-// ── SCAN PAGE ─────────────────────────────────────────────────────────────────
-function renderScanPage(){
-  stopScanner();
-  const app=document.getElementById("app");app.innerHTML="";
-  const page=document.createElement("div");page.className="scan-page";
-
-  const hint=document.createElement("div");hint.className="scan-hint";
-  if(S.showOrderItemScan)hint.textContent=`${S.orderItems.length} item${S.orderItems.length!==1?"s":""} scanned for order`;
-  else if(S.showOrderQRScan)hint.textContent="Now scan the ORDER QR code";
-  else if(S.showMultiScan)hint.textContent=`${S.multiCodes.length} code${S.multiCodes.length!==1?"s":""} scanned`;
-  else hint.textContent=S.scanHint||"Point camera at QR code";
-  page.appendChild(hint);
-
-  const video=document.createElement("video");video.id="scan-video";video.className="scan-video";video.setAttribute("playsinline","");video.setAttribute("muted","");page.appendChild(video);
-  const canvas=document.createElement("canvas");canvas.id="scan-canvas";canvas.className="scan-canvas";page.appendChild(canvas);
-  const status=document.createElement("div");status.id="scan-status";status.className="scan-status";page.appendChild(status);
-
-  // Manual input
-  const mw=document.createElement("div");mw.className="scan-manual";
-  const mi=document.createElement("input");mi.type="text";mi.placeholder="Or type code manually…";
-  mi.onkeydown=e=>{if(e.key==="Enter"&&mi.value.trim()){handleScan(mi.value.trim());mi.value="";}};
-  mw.appendChild(mi);page.appendChild(mw);
-
-  // Close button
-  const closeBtn=document.createElement("button");closeBtn.className="scan-close";closeBtn.textContent="✕";
-  closeBtn.onclick=()=>{
-    stopScanner();
-    setState({
-      scanning:false,scanMode:null,showOrderItemScan:false,showOrderQRScan:false,
-      showMultiScan:false,activeOrder:null
-    });
-  };
-  page.appendChild(closeBtn);
-
-  // Order item scan — done button
-  if(S.showOrderItemScan&&S.orderItems.length>0){
-    const doneBtn=document.createElement("button");
-    doneBtn.style.cssText="position:absolute;bottom:80px;left:50%;transform:translateX(-50%);background:var(--primary);color:#fff;border:none;border-radius:10px;padding:12px 32px;font-size:15px;font-weight:700;cursor:pointer;white-space:nowrap";
-    doneBtn.textContent=`Done — ${S.orderItems.length} item${S.orderItems.length!==1?"s":""} →`;
-    doneBtn.onclick=()=>{stopScanner();setState({showOrderItemScan:false,scanning:false,showOrderQRScan:true,scanning:true,scanHint:"Scan the ORDER QR code"});};
-    page.appendChild(doneBtn);
-  }
-
-  // Multi-scan done button
-  if(S.showMultiScan&&S.multiCodes.length>0){
-    const doneBtn=document.createElement("button");
-    doneBtn.style.cssText="position:absolute;bottom:80px;left:50%;transform:translateX(-50%);background:var(--primary);color:#fff;border:none;border-radius:10px;padding:12px 32px;font-size:15px;font-weight:700;cursor:pointer;white-space:nowrap";
-    doneBtn.textContent=`Done — ${S.multiCodes.length} code${S.multiCodes.length!==1?"s":""} →`;
-    doneBtn.onclick=()=>{stopScanner();setState({showMultiScan:false,scanning:false,showMultiConfirm:true});};
-    page.appendChild(doneBtn);
-  }
-
-  app.appendChild(page);
-  setTimeout(startScanner,100);
-}
-
-// ── MULTI-SCAN SCREENS ────────────────────────────────────────────────────────
-function renderMultiDetails(){
-  const app=document.getElementById("app");app.innerHTML="";
-  const page=document.createElement("div");page.className="full-page";
-  const inner=document.createElement("div");inner.className="full-inner";
-
-  inner.innerHTML=`<div style="font-size:20px;font-weight:800;margin-bottom:4px">Multi-Scan Check-In</div><div style="font-size:13px;color:var(--muted);margin-bottom:20px">Step 1 of 3 — Enter item details</div>`;
-
-  let name="",type="",expDate="";
-  const fields=[
-    {id:"md-name",label:"Item Name",type:"text",placeholder:"e.g. N95 Mask, Gloves, Cable",onInput:v=>{name=v;}},
-    {id:"md-type",label:"Category / Type",type:"text",placeholder:"e.g. PPE, Equipment, Supply",onInput:v=>{type=v;}},
-    {id:"md-exp",label:"Expiry Date (optional)",type:"date",placeholder:"",onInput:v=>{expDate=v;}},
-  ];
-  fields.forEach(f=>{
-    const div=document.createElement("div");div.className="field";
-    div.innerHTML=`<label>${f.label}</label><input id="${f.id}" type="${f.type}" placeholder="${f.placeholder}"/>`;
-    div.querySelector("input").oninput=e=>f.onInput(e.target.value);
-    inner.appendChild(div);
-  });
-
-  const nextBtn=document.createElement("button");nextBtn.className="btn btn-primary";nextBtn.textContent="Next — Scan Codes →";
-  nextBtn.onclick=()=>{
-    name=document.getElementById("md-name")?.value.trim();
-    type=document.getElementById("md-type")?.value.trim();
-    expDate=document.getElementById("md-exp")?.value;
-    if(!name){showToast("Please enter an item name","warn");return;}
-    setState({multiDetails:{name,type,expDate},showMultiDetails:false,showMultiScan:true,scanning:true,multiCodes:[]});
-  };
-  inner.appendChild(nextBtn);
-
-  const cancelBtn=document.createElement("button");cancelBtn.className="btn btn-ghost";cancelBtn.textContent="Cancel";
-  cancelBtn.onclick=()=>setState({multiMode:false,showMultiDetails:false,multiDetails:null});
-  inner.appendChild(cancelBtn);
-
-  page.appendChild(inner);app.appendChild(page);
-}
-
-function renderMultiConfirm(){
-  const app=document.getElementById("app");app.innerHTML="";
-  const page=document.createElement("div");page.className="full-page";
-  const inner=document.createElement("div");inner.className="full-inner";
-  const{multiDetails,multiCodes}=S;
-
-  inner.innerHTML=`<div style="font-size:20px;font-weight:800;margin-bottom:4px">Confirm Multi-Scan</div><div style="font-size:13px;color:var(--muted);margin-bottom:20px">Step 3 of 3 — Review and confirm</div>`;
-
-  const summary=document.createElement("div");summary.className="card";summary.style.marginBottom="16px";
-  summary.innerHTML=`
-    <div style="font-size:16px;font-weight:700;margin-bottom:4px">${multiDetails.name}</div>
-    <div style="font-size:13px;color:var(--muted)">${multiDetails.type||"No category"} · ${multiDetails.expDate?`Exp ${multiDetails.expDate}`:"No expiry"}</div>
-    <div style="font-size:24px;font-weight:800;color:var(--primary);margin-top:10px">${multiCodes.length} items</div>
-  `;
-  inner.appendChild(summary);
-
-  const scrollBox=document.createElement("div");scrollBox.style.cssText="max-height:200px;overflow-y:auto;margin-bottom:16px";
-  multiCodes.forEach((code,i)=>{
-    const r=document.createElement("div");r.style.cssText="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 12px;margin-bottom:4px;font-size:12px;font-family:monospace;color:var(--dim);display:flex;justify-content:space-between";
-    r.innerHTML=`<span>${code}</span><span style="color:var(--muted)">#${i+1}</span>`;
-    scrollBox.appendChild(r);
-  });
-  inner.appendChild(scrollBox);
-
-  const confirmBtn=document.createElement("button");confirmBtn.className="btn btn-green";confirmBtn.textContent=`✓ Check In ${multiCodes.length} Items`;
-  confirmBtn.onclick=submitMultiCheckin;inner.appendChild(confirmBtn);
-  const backBtn=document.createElement("button");backBtn.className="btn btn-ghost";backBtn.textContent="← Re-scan";
-  backBtn.onclick=()=>setState({showMultiConfirm:false,showMultiScan:true,scanning:true});
-  inner.appendChild(backBtn);
-  const cancelBtn=document.createElement("button");cancelBtn.className="btn btn-ghost";cancelBtn.textContent="Cancel";
-  cancelBtn.onclick=()=>setState({multiMode:false,showMultiConfirm:false,multiDetails:null,multiCodes:[]});
-  inner.appendChild(cancelBtn);
-
-  page.appendChild(inner);app.appendChild(page);
-}
-
-// ── ORDER SUMMARY ─────────────────────────────────────────────────────────────
-function renderOrderSummary(){
-  const app=document.getElementById("app");app.innerHTML="";
-  const page=document.createElement("div");page.className="full-page";
-  const inner=document.createElement("div");inner.className="full-inner";
-  const{orderItems,pendingOrderQR,items,owners}=S;
-
-  const hdr=document.createElement("div");hdr.style.cssText="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px";
-  hdr.innerHTML=`<div style="font-size:20px;font-weight:800">Confirm Order</div>`;
-  const xBtn=document.createElement("button");xBtn.style.cssText="background:var(--surface2);border:1px solid var(--border);color:var(--dim);font-size:15px;border-radius:8px;padding:8px 12px;cursor:pointer;font-family:inherit";
-  xBtn.textContent="✕ Cancel";xBtn.onclick=()=>setState({showOrderSummary:false,orderItems:[],pendingOrderQR:null});
-  hdr.appendChild(xBtn);inner.appendChild(hdr);
-
-  // Order name
-  inner.innerHTML+=`<div class="field"><label>Order Name</label><input id="order-name" type="text" placeholder="e.g. Shipment to Site A, June Restock…"/></div>`;
-
-  // QR preview
-  const qrCard=document.createElement("div");qrCard.className="card mb16";
-  qrCard.innerHTML=`<div class="label">Order QR Code</div><div id="order-qr" style="background:#fff;padding:8px;border-radius:8px;display:inline-block;margin-top:4px"></div><div style="font-size:11px;color:var(--muted);margin-top:6px;font-family:monospace">${pendingOrderQR}</div>`;
-  inner.appendChild(qrCard);
-  setTimeout(()=>{
-    const qrEl=document.getElementById("order-qr");
-    if(qrEl&&window.QRCode)new window.QRCode(qrEl,{text:pendingOrderQR,width:100,height:100});
-  },50);
-
-  // Items list
-  const itemsCard=document.createElement("div");itemsCard.className="card mb16";
-  const poolOwner=owners.find(o=>o.id.toUpperCase()==="POOL")||owners[0];
-  itemsCard.innerHTML=`<div class="label">${orderItems.length} Item${orderItems.length!==1?"s":""}</div>`;
-  orderItems.forEach(barcode=>{
-    const item=items.find(i=>i.barcode===barcode);
-    const r=document.createElement("div");r.style.cssText="font-size:13px;color:var(--dim);padding:4px 0;border-bottom:1px solid var(--border)";
-    r.textContent=item?item.name:barcode;itemsCard.appendChild(r);
-  });
-  inner.appendChild(itemsCard);
-
-  const confirmBtn=document.createElement("button");confirmBtn.className="btn btn-primary";confirmBtn.textContent="🚚 Create Order";
-  confirmBtn.onclick=()=>{
-    const name=document.getElementById("order-name")?.value.trim();
-    if(!name){showToast("Please enter an order name","warn");return;}
-    submitCreateOrder(name,orderItems,pendingOrderQR);
-  };
-  inner.appendChild(confirmBtn);
-
-  const printBtn=document.createElement("button");printBtn.className="btn btn-ghost";printBtn.textContent="🖨️ Print QR Label";
-  printBtn.onclick=()=>{
-    const pa=document.getElementById("print-area");
-    pa.innerHTML=`<h2>Order QR</h2><div id="print-qr" style="margin:16px auto;display:inline-block;background:#fff;padding:8px"></div><p style="font-family:monospace;font-size:12px">${pendingOrderQR}</p>`;
-    if(window.QRCode)new window.QRCode(document.getElementById("print-qr"),{text:pendingOrderQR,width:180,height:180});
-    setTimeout(()=>window.print(),200);
-  };
-  inner.appendChild(printBtn);
-
-  page.appendChild(inner);app.appendChild(page);
-}
-
-// ── MODALS ────────────────────────────────────────────────────────────────────
-function renderModal(){
-  const{modal,owners,profile}=S;
-  if(!modal)return null;
-
-  function overlay(inner,center){
-    const div=document.createElement("div");div.className=center?"overlay-center":"overlay";
-    div.onclick=e=>{if(e.target===div)setState({modal:null});};
-    div.appendChild(inner);return div;
-  }
-  function modalInner(){const d=document.createElement("div");d.className="overlay-inner";return d;}
-
-  // ── Check In ──
-  if(modal.type==="checkin"){
-    const inner=modalInner();
-    inner.innerHTML=`<div class="modal-title">Check In Item</div><div class="modal-sub">Barcode: <span style="font-family:monospace;color:var(--primary)">${modal.barcode}</span></div>`;
-    let name="",type="",expDate="",ownerId=profile.role==="admin"?"":profile.ownerId;
-    const fields=[
-      {id:"ci-name",label:"Item Name",type:"text",placeholder:"e.g. N95 Mask",onInput:v=>{name=v;}},
-      {id:"ci-type",label:"Category",type:"text",placeholder:"e.g. PPE, Equipment",onInput:v=>{type=v;}},
-      {id:"ci-exp",label:"Expiry Date (optional)",type:"date",onInput:v=>{expDate=v;}},
-    ];
-    fields.forEach(f=>{
-      const div=document.createElement("div");div.className="field";
-      div.innerHTML=`<label>${f.label}</label><input id="${f.id}" type="${f.type}" placeholder="${f.placeholder||""}"/>`;
-      div.querySelector("input").oninput=e=>f.onInput(e.target.value);inner.appendChild(div);
-    });
-    if(profile.role==="admin"){
-      const sel=document.createElement("div");sel.className="field";
-      sel.innerHTML=`<label>Location</label><select id="ci-owner">${owners.map(o=>`<option value="${o.id}">${o.name}</option>`).join("")}</select>`;
-      sel.querySelector("select").onchange=e=>{ownerId=e.target.value;};inner.appendChild(sel);
-    }
-    const btn=document.createElement("button");btn.className="btn btn-green";btn.textContent="✓ Check In";
-    btn.onclick=()=>{
-      name=document.getElementById("ci-name")?.value.trim();
-      type=document.getElementById("ci-type")?.value.trim();
-      expDate=document.getElementById("ci-exp")?.value;
-      if(profile.role==="admin")ownerId=document.getElementById("ci-owner")?.value;
-      if(!name){showToast("Please enter an item name","warn");return;}
-      if(!ownerId){showToast("Please select a location","warn");return;}
-      submitCheckin(modal.barcode,name,type,expDate,ownerId);
-      setState({modal:null,scanning:S.activeOrder?true:false});
-    };
-    inner.appendChild(btn);
-    const cancel=document.createElement("button");cancel.className="btn btn-ghost";cancel.textContent="Cancel";cancel.onclick=()=>setState({modal:null,scanning:S.scanMode?true:false});inner.appendChild(cancel);
-    return overlay(inner);
-  }
-
-  // ── Check Out ──
-  if(modal.type==="checkout"){
-    const{item}=modal;const inner=modalInner();
-    const ownerName=owners.find(o=>o.id===item.ownerId)?.name||item.ownerId;
-    inner.innerHTML=`<div class="modal-title">Check Out</div><div class="modal-sub">${item.name} · ${ownerName}</div>`;
-    const field=document.createElement("div");field.className="field";
-    field.innerHTML=`<label>Used By / Reason</label><input id="co-user" type="text" placeholder="Who is using this item?"/>`;inner.appendChild(field);
-    const btn=document.createElement("button");btn.className="btn btn-amber";btn.textContent="📤 Check Out";
-    btn.onclick=()=>{
-      const usedBy=document.getElementById("co-user")?.value.trim();
-      if(!usedBy){showToast("Please enter who is using this","warn");return;}
-      submitCheckout(item,usedBy);setState({modal:null,scanning:S.scanMode?true:false});
-    };inner.appendChild(btn);
-    const cancel=document.createElement("button");cancel.className="btn btn-ghost";cancel.textContent="Cancel";cancel.onclick=()=>setState({modal:null,scanning:S.scanMode?true:false});inner.appendChild(cancel);
-    return overlay(inner);
-  }
-
-  // ── Transfer ──
-  if(modal.type==="transfer"){
-    const{item}=modal;const inner=modalInner();
-    const fromName=owners.find(o=>o.id===item.ownerId)?.name||item.ownerId;
-    inner.innerHTML=`<div class="modal-title">Transfer Item</div><div class="modal-sub">${item.name} · from ${fromName}</div>`;
-    const availOwners=profile.role==="admin"?owners.filter(o=>o.id!==item.ownerId):owners.filter(o=>o.id===profile.ownerId&&o.id!==item.ownerId);
-    if(availOwners.length===0){inner.innerHTML+=`<div style="color:var(--muted);font-size:14px;text-align:center;padding:20px 0">No other locations available</div>`;}
-    else{
-      const sel=document.createElement("div");sel.className="field";
-      sel.innerHTML=`<label>Transfer To</label><select id="tr-owner">${availOwners.map(o=>`<option value="${o.id}">${o.name}</option>`).join("")}</select>`;inner.appendChild(sel);
-      const btn=document.createElement("button");btn.className="btn btn-purple";btn.textContent="🔄 Transfer";
-      btn.onclick=()=>{
-        const toId=document.getElementById("tr-owner")?.value;
-        submitTransfer(item,toId);setState({modal:null,scanning:S.scanMode?true:false});
-      };inner.appendChild(btn);
-    }
-    const cancel=document.createElement("button");cancel.className="btn btn-ghost";cancel.textContent="Cancel";cancel.onclick=()=>setState({modal:null,scanning:S.scanMode?true:false});inner.appendChild(cancel);
-    return overlay(inner);
-  }
-
-  // ── Receive Order ──
-  if(modal.type==="receive_order"){
-    const{order,barcodes}=modal;const inner=modalInner();
-    inner.innerHTML=`<div class="modal-title">Receive Order</div><div class="modal-sub">${order.name} · ${barcodes.length} item${barcodes.length!==1?"s":""}</div>`;
-    if(profile.role==="admin"){
-      const sel=document.createElement("div");sel.className="field";
-      sel.innerHTML=`<label>Deliver To</label><select id="ro-owner">${owners.map(o=>`<option value="${o.id}">${o.name}</option>`).join("")}</select>`;inner.appendChild(sel);
-    }
-    const btn=document.createElement("button");btn.className="btn btn-green";btn.textContent="📦 Receive Order";
-    btn.onclick=()=>{
-      const toOwnerId=profile.role==="admin"?(document.getElementById("ro-owner")?.value||owners[0]?.id):profile.ownerId;
-      submitReceiveOrder(order,barcodes,toOwnerId);
-    };inner.appendChild(btn);
-    const cancel=document.createElement("button");cancel.className="btn btn-ghost";cancel.textContent="Cancel";cancel.onclick=()=>setState({modal:null});inner.appendChild(cancel);
-    return overlay(inner);
-  }
-
-  // ── Item Detail ──
-  if(modal.type==="item_detail"){
-    const{item}=modal;
-    const page=document.createElement("div");page.className="full-page";
-    const inner=document.createElement("div");inner.className="full-inner";
-    const ownerName=owners.find(o=>o.id===item.ownerId)?.name||item.ownerId;
-    const statusClass={active:"status-active",used:"status-used",transit:"status-transit"}[item.status]||"status-active";
-
-    const topRow=document.createElement("div");topRow.style.cssText="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;padding-top:8px";
-    topRow.innerHTML=`<div><div style="font-size:20px;font-weight:800">${item.name}</div><div style="font-family:monospace;font-size:12px;color:var(--muted);margin-top:2px">${item.barcode}</div></div><span class="status-badge ${statusClass}" style="font-size:12px;padding:5px 12px">${item.status}</span>`;
-    const xBtn=document.createElement("button");xBtn.style.cssText="background:var(--surface2);border:1px solid var(--border);color:var(--dim);font-size:16px;border-radius:8px;padding:8px 12px;cursor:pointer;margin-left:8px;flex-shrink:0";xBtn.textContent="✕";xBtn.onclick=()=>setState({modal:null});
-    topRow.querySelector("div").after(xBtn);// won't work cleanly, let me restructure
-    inner.appendChild(topRow);
-
-    // Status card
-    const sc=document.createElement("div");sc.className="card mb16";
-    sc.innerHTML=`<div class="label">Current Status</div><div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:4px">
-      <div><div style="color:var(--muted);font-size:11px">Location</div><div style="font-weight:700">${ownerName}</div></div>
-      <div><div style="color:var(--muted);font-size:11px">Category</div><div style="font-weight:700">${item.type||"—"}</div></div>
-      <div><div style="color:var(--muted);font-size:11px">Expires</div><div style="font-weight:700">${item.expDate?item.expDate.substring(0,10):"—"}</div></div>
-      ${item.usedBy?`<div><div style="color:var(--muted);font-size:11px">Used By</div><div style="font-weight:700">${item.usedBy}</div></div>`:""}
-    </div>`;
-    inner.appendChild(sc);
-
-    // Actions
-    const actDiv=document.createElement("div");actDiv.style.cssText="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap";
-    if(item.status==="active"){
-      if(profile.role==="admin"||item.ownerId===profile.ownerId){
-        const coBtn=document.createElement("button");coBtn.className="btn btn-amber";coBtn.style.cssText+="flex:1;min-width:120px";coBtn.textContent="Check Out";
-        coBtn.onclick=()=>setState({modal:{type:"checkout",item}});actDiv.appendChild(coBtn);
-      }
-      if(profile.role==="admin"||(owners.length>1&&item.ownerId!==profile.ownerId)){
-        const trBtn=document.createElement("button");trBtn.className="btn btn-purple";trBtn.style.cssText+="flex:1;min-width:120px";trBtn.textContent="Transfer";
-        trBtn.onclick=()=>setState({modal:{type:"transfer",item}});actDiv.appendChild(trBtn);
-      }
-    }
-    if(item.status==="used"&&(profile.role==="admin"||item.ownerId===profile.ownerId)){
-      const ucBtn=document.createElement("button");ucBtn.className="btn btn-blue";ucBtn.style.cssText+="flex:1";ucBtn.textContent="↩️ Undo Checkout";
-      ucBtn.onclick=()=>{setState({modal:{type:"undo_checkout",item}});};actDiv.appendChild(ucBtn);
-    }
-    if(actDiv.children.length>0)inner.appendChild(actDiv);
-
-    // History
-    const itemLog=S.log.filter(l=>l.barcode===item.barcode);
-    const logHdr=document.createElement("div");logHdr.className="label";logHdr.textContent=`Activity History (${itemLog.length} events)`;inner.appendChild(logHdr);
-    if(itemLog.length===0){const e=document.createElement("div");e.style.cssText="color:var(--muted);font-size:13px;text-align:center;padding:20px 0";e.textContent="No activity recorded yet";inner.appendChild(e);}
-    else{
-      const actionColors={CHECK_IN:"#22c55e",CHECK_OUT:"#f59e0b",TRANSFER:"#6366f1",ORDER_IN:"#0ea5e9",ORDER_OUT:"#a855f7",UNDO_CHECKOUT:"#94a3b8"};
-      const actionIcons={CHECK_IN:"📥",CHECK_OUT:"📤",TRANSFER:"🔄",ORDER_IN:"📦",ORDER_OUT:"🚚",UNDO_CHECKOUT:"↩️"};
-      itemLog.forEach(entry=>{
-        const row=document.createElement("div");row.className="log-row";
-        const icon=document.createElement("span");icon.style.cssText="font-size:18px;margin-top:2px";icon.textContent=actionIcons[entry.action]||"📋";
-        const info=document.createElement("div");info.style.flex="1";
-        const color=actionColors[entry.action]||"#94a3b8";
-        let detail="";if(entry.from&&entry.to)detail=entry.from+" → "+entry.to;else if(entry.to)detail="→ "+entry.to;
-        info.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center"><span style="color:${color};font-weight:700;font-size:12px">${(entry.action||"").replace(/_/g," ")}</span><span style="color:var(--muted);font-size:10px">${formatDate(entry.ts)}</span></div>${detail?`<div style="color:var(--dim);font-size:12px;margin-top:3px">${detail}</div>`:""}<div style="color:var(--muted);font-size:11px;margin-top:2px">by ${entry.user}</div>`;
-        row.appendChild(icon);row.appendChild(info);inner.appendChild(row);
+  if(tab==="inventory"){
+    if(admin){
+      const filters=el("div",{style:{display:"flex",gap:"8px",marginBottom:"12px",flexWrap:"wrap"}});
+      const allBtn=el("button",{style:{padding:"7px 14px",borderRadius:"7px",border:"1px solid #334155",background:!selectedOwner?"#0ea5e9":"#1e293b",color:!selectedOwner?"#fff":"#94a3b8",fontSize:"13px",fontWeight:"600"}},"All");
+      allBtn.onclick=()=>setState({selectedOwner:null});filters.appendChild(allBtn);
+      owners.filter(o=>o.id!=="USED").forEach(o=>{
+        const icon=o.id.toUpperCase()==="POOL"?"🏪":o.type==="locker"?"🗄":"👤";
+        const btn=el("button",{style:{padding:"7px 14px",borderRadius:"7px",border:"1px solid #334155",background:selectedOwner?.id===o.id?"#0ea5e9":"#1e293b",color:selectedOwner?.id===o.id?"#fff":"#94a3b8",fontSize:"13px",fontWeight:"600"}},icon+" "+o.name);
+        btn.onclick=()=>setState({selectedOwner:o});filters.appendChild(btn);
       });
+      content.appendChild(filters);
     }
-    const closeBtn=document.createElement("button");closeBtn.className="btn btn-ghost";closeBtn.style.marginTop="16px";closeBtn.textContent="Close";closeBtn.onclick=()=>setState({modal:null});inner.appendChild(closeBtn);
-    page.appendChild(inner);return page;
-  }
-
-  // ── Undo Checkout Confirm ──
-  if(modal.type==="undo_checkout"){
-    const{item}=modal;const inner=modalInner();
-    const lastCheckout=S.log.find(l=>l.barcode===item.barcode&&l.action==="CHECK_OUT");
-    const prevLocation=lastCheckout?.from||"Pool";
-    inner.innerHTML=`<div class="modal-title">Undo Checkout?</div><div class="modal-sub">${item.name} will be returned to: <strong style="color:var(--text)">${prevLocation}</strong></div>`;
-    const btn=document.createElement("button");btn.className="btn btn-primary";btn.textContent="✓ Yes, Undo Checkout";
-    btn.onclick=()=>{setState({modal:null});submitUndoCheckout(item);};inner.appendChild(btn);
-    const cancel=document.createElement("button");cancel.className="btn btn-ghost";cancel.textContent="Cancel";cancel.onclick=()=>setState({modal:{type:"item_detail",item}});inner.appendChild(cancel);
-    return overlay(inner);
-  }
-
-  // ── Manage Users ──
-  if(modal.type==="manage_users"){
-    const inner=modalInner();
-    inner.innerHTML=`<div class="modal-title">Team Members</div><div class="modal-sub">${S.tenantUsers.length} member${S.tenantUsers.length!==1?"s":""}</div>`;
-    S.tenantUsers.forEach(u=>{
-      const r=document.createElement("div");r.style.cssText="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center";
-      const ownerName=owners.find(o=>o.id===u.ownerId)?.name||u.ownerId||"—";
-      r.innerHTML=`<div><div style="font-weight:700;font-size:14px">${u.displayName||u.email}</div><div style="font-size:12px;color:var(--muted)">${u.email} · ${ownerName}</div></div><span style="font-size:11px;font-weight:700;color:${u.role==="admin"?"var(--primary)":"var(--dim)"};text-transform:uppercase">${u.role}</span>`;
-      inner.appendChild(r);
+    const sw=document.createElement("div");sw.style.cssText="position:relative;margin-bottom:12px;";
+    const si=document.createElement("input");si.type="text";si.placeholder="🔍  Search by name or barcode…";si.style.cssText="width:100%;box-sizing:border-box;";si.value=S.inventorySearch||"";
+    let sd=null;si.oninput=function(){const val=this.value;clearTimeout(sd);sd=setTimeout(()=>setState({inventorySearch:val}),800);};
+    sw.appendChild(si);content.appendChild(sw);
+    const searchTerm=(S.inventorySearch||"").toLowerCase().trim();
+    const baseItems=admin?(selectedOwner?activeItems.filter(i=>i.ownerId===selectedOwner.id):activeItems):visActiveItems;
+    const displayItems=searchTerm?baseItems.filter(i=>i.name.toLowerCase().includes(searchTerm)||i.barcode.toLowerCase().includes(searchTerm)):baseItems;
+    if(displayItems.length>0){
+      const itemTypes=["DFX","DFXM","BTFT","DTF-31","DTF-31Q","DTF-18","DTF-40","DTFD-13","DTFD-24","BVNA","RF UNIT","IntraVu","IntraVu Monitor"];
+      const counts={};displayItems.forEach(item=>{if(itemTypes.includes(item.name))counts[item.name]=(counts[item.name]||0)+1;});
+      if(Object.keys(counts).length>0){
+        const sc=document.createElement("div");sc.style.cssText="background:#111827;border-radius:12px;border:1px solid #1e293b;padding:14px 16px;margin-bottom:16px;";
+        const st=document.createElement("p");st.style.cssText="color:#94a3b8;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin:0 0 10px;";st.textContent=selectedOwner?"Count — "+selectedOwner.name:"Count — All Inventories";sc.appendChild(st);
+        const grid=document.createElement("div");grid.style.cssText="display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:8px;";
+        itemTypes.forEach(t=>{if(counts[t]){const chip=document.createElement("div");chip.style.cssText="background:#0f172a;border:1px solid #334155;border-radius:8px;padding:8px 10px;text-align:center;";chip.innerHTML="<div style='color:#38bdf8;font-weight:700;font-size:18px'>"+counts[t]+"</div><div style='color:#64748b;font-size:11px;margin-top:2px'>"+t+"</div>";grid.appendChild(chip);}});
+        sc.appendChild(grid);content.appendChild(sc);
+      }
+    }
+    const transitItems=items.filter(i=>i.status==="transit");
+    if(admin&&transitItems.length>0){const tCard=document.createElement("div");tCard.style.cssText="background:#431407;border:1px solid #78350f;border-radius:10px;padding:14px;margin-bottom:12px;";tCard.innerHTML="<p style='color:#fcd34d;font-weight:700;font-size:13px;margin:0 0 8px'>🚚 In Transit ("+transitItems.length+")</p>"+transitItems.map(i=>"<p style='color:#fbbf24;font-size:12px;margin:2px 0'>• "+i.name+" — "+i.barcode+"</p>").join("");content.appendChild(tCard);}
+    if(displayItems.length===0)content.appendChild(el("p",{style:{color:"#334155",textAlign:"center",fontSize:"13px",marginTop:"30px"}},"No active items"));
+    displayItems.forEach(item=>{
+      const isExp=item.expDate&&new Date(item.expDate)<new Date();const days=item.expDate?Math.ceil((new Date(item.expDate)-Date.now())/86400000):null;const soon=days!==null&&days>=0&&days<=120;
+      const card=el("div",{style:{background:"#111827",borderRadius:"10px",padding:"12px 14px",marginBottom:"8px",border:"1px solid "+(isExp?"#7f1d1d":soon?"#78350f":"#1e293b")}});
+      const badge=isExp?'<span class="badge" style="background:#7f1d1d;color:#fca5a5">EXPIRED</span>':soon?'<span class="badge" style="background:#78350f;color:#fcd34d">'+days+'d LEFT</span>':'<span class="badge" style="background:#14532d;color:#86efac">OK</span>';
+      card.innerHTML='<div style="display:flex;justify-content:space-between;align-items:flex-start"><div><div style="font-weight:700;color:#f1f5f9;font-size:14px">'+item.name+'</div><div style="color:#64748b;font-size:11px;margin-top:2px;font-family:monospace">'+item.barcode+' · '+(item.type||"")+'</div></div>'+badge+'</div><div style="display:flex;gap:12px;margin-top:6px"><span style="color:#64748b;font-size:11px">Exp: '+(item.expDate||"—")+'</span>'+(admin?'<span style="color:#64748b;font-size:11px">Owner: '+(owners.find(o=>o.id===item.ownerId)?.name||item.ownerId)+'</span>':"")+'</div>';
+      const hb=document.createElement("button");hb.textContent="📋 History";hb.style.cssText="margin-top:8px;padding:5px 10px;border-radius:7px;border:1px solid #334155;background:#1e293b;color:#94a3b8;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;";hb.onclick=function(e){e.stopPropagation();setState({modal:{type:"item_history",item}});};card.appendChild(hb);content.appendChild(card);
     });
-    const closeBtn=document.createElement("button");closeBtn.className="btn btn-ghost";closeBtn.textContent="Close";closeBtn.onclick=()=>setState({modal:null});inner.appendChild(closeBtn);
-    return overlay(inner);
   }
-
-  // ── Manage Owners/Locations ──
-  if(modal.type==="manage_owners"){
-    const inner=modalInner();
-    inner.innerHTML=`<div class="modal-title">Inventory Locations</div><div class="modal-sub">Add locations like warehouses, vehicles, or people</div>`;
-    owners.forEach(o=>{
-      const r=document.createElement("div");r.style.cssText="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center";
-      r.innerHTML=`<span style="font-weight:600">${o.name}</span><span style="font-size:11px;color:var(--muted);text-transform:uppercase">${o.type||"location"}</span>`;
-      inner.appendChild(r);
+  if(tab==="used"){
+    content.appendChild(el("p",{style:{color:"#475569",fontSize:"12px",fontWeight:"600",margin:"0 0 12px",textTransform:"uppercase",letterSpacing:".07em"}},admin?"All Used Items":"Your Used Items"));
+    if(visUsedItems.length===0)content.appendChild(el("p",{style:{color:"#334155",textAlign:"center",fontSize:"13px",marginTop:"30px"}},"No used items yet"));
+    visUsedItems.forEach(item=>{
+      const card=el("div",{style:{background:"#111827",borderRadius:"10px",padding:"12px 14px",marginBottom:"8px",border:"1px solid #374151"}});
+      card.innerHTML='<div style="display:flex;justify-content:space-between;align-items:flex-start"><div><div style="font-weight:700;color:#9ca3af;font-size:14px">'+item.name+'</div><div style="color:#64748b;font-size:11px;margin-top:2px;font-family:monospace">'+item.barcode+' · '+(item.type||"")+'</div></div><span class="badge" style="background:#374151;color:#9ca3af">USED</span></div><div style="display:flex;gap:12px;margin-top:6px">'+(item.expDate?'<span style="color:#64748b;font-size:11px">Exp: '+item.expDate+'</span>':"")+(admin?'<span style="color:#64748b;font-size:11px">Used by: '+(item.usedBy||"—")+'</span>':"")+'</div>';
+      if(admin){card.style.cursor="pointer";card.onclick=()=>setState({modal:{type:"undo_checkout",item}});}
+      content.appendChild(card);
     });
-    // Add new
-    inner.innerHTML+=`<div style="margin-top:12px;font-size:11px;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Add Location</div>`;
-    const newField=document.createElement("div");newField.style.display="flex";newField.style.gap="8px";
-    newField.innerHTML=`<input id="new-owner-name" type="text" placeholder="Location name" style="flex:1;padding:10px 12px;border-radius:8px;background:var(--surface2);border:1px solid var(--border);color:var(--text)"/>`;
-    const addBtn=document.createElement("button");addBtn.style.cssText="background:var(--primary);color:#fff;border:none;border-radius:8px;padding:10px 16px;font-weight:700;cursor:pointer;white-space:nowrap";addBtn.textContent="Add";
-    addBtn.onclick=async()=>{
-      const name=document.getElementById("new-owner-name")?.value.trim();
-      if(!name){showToast("Enter a location name","warn");return;}
-      const id=name.toUpperCase().replace(/\s+/g,"_");
-      await window._setDoc(tCol("owners"),id,{name,type:"location"});
-      showToast("✅ Location added");
-      loadData();setState({modal:null});
-    };
-    newField.appendChild(addBtn);inner.appendChild(newField);
-    const closeBtn=document.createElement("button");closeBtn.className="btn btn-ghost";closeBtn.style.marginTop="12px";closeBtn.textContent="Close";closeBtn.onclick=()=>setState({modal:null});inner.appendChild(closeBtn);
-    return overlay(inner);
   }
-
-  // ── Invite ──
-  if(modal.type==="invite"){
-    const inner=modalInner();
-    inner.innerHTML=`<div class="modal-title">Invite Team Member</div><div class="modal-sub">Set the role and location, then share the link</div>`;
-    const roleField=document.createElement("div");roleField.className="field";
-    roleField.innerHTML=`<label>Role</label><select id="inv-role"><option value="member">Member</option><option value="admin">Admin</option></select>`;inner.appendChild(roleField);
-    const ownerField=document.createElement("div");ownerField.className="field";
-    ownerField.innerHTML=`<label>Assign to Location</label><select id="inv-owner">${owners.map(o=>`<option value="${o.id}">${o.name}</option>`).join("")}</select>`;inner.appendChild(ownerField);
-    const resultDiv=document.createElement("div");resultDiv.style.display="none";
-    resultDiv.innerHTML=`<div style="background:var(--primary-glow);border:1px solid var(--primary);border-radius:8px;padding:12px 14px;margin-bottom:12px"><div style="font-size:11px;font-weight:700;color:var(--primary);text-transform:uppercase;margin-bottom:6px">Invite Link — share this:</div><div id="inv-link-text" style="font-size:12px;color:var(--text);word-break:break-all;font-family:monospace"></div></div>`;
-    inner.appendChild(resultDiv);
-    const genBtn=document.createElement("button");genBtn.className="btn btn-primary";genBtn.textContent="Generate Invite Link";
-    genBtn.onclick=async()=>{
-      const role=document.getElementById("inv-role")?.value;
-      const ownerId=document.getElementById("inv-owner")?.value;
-      const ownerName=owners.find(o=>o.id===ownerId)?.name||"";
-      const tenantName=S.tenant?.name||"";
-      const expiresAt=new Date(Date.now()+7*24*60*60*1000).toISOString();// 7 days
-      genBtn.disabled=true;genBtn.textContent="Generating…";
-      try{
-        const code=await window._addDoc("invites",{
-          tenantId:S.profile.tenantId,tenantName,role,ownerId,ownerName,
-          createdBy:S.profile.displayName,createdAt:new Date().toISOString(),
-          expiresAt,usedBy:null
-        });
-        const link=`${window.location.origin}${window.location.pathname}?invite=${code}`;
-        const linkText=document.getElementById("inv-link-text");
-        if(linkText)linkText.textContent=link;
-        resultDiv.style.display="block";
-        genBtn.textContent="✓ Link Generated";
-        // Copy to clipboard
-        try{await navigator.clipboard.writeText(link);showToast("✅ Invite link copied to clipboard!");}
-        catch{showToast("Link generated — copy it above");}
-      }catch(e){showToast("Failed: "+e.message,"err");genBtn.disabled=false;genBtn.textContent="Generate Invite Link";}
-    };
-    inner.appendChild(genBtn);
-    const closeBtn=document.createElement("button");closeBtn.className="btn btn-ghost";closeBtn.style.marginTop="10px";closeBtn.textContent="Close";closeBtn.onclick=()=>setState({modal:null});inner.appendChild(closeBtn);
-    return overlay(inner);
+  if(tab==="orders"){
+    if(orders.length===0)content.appendChild(el("p",{style:{color:"#334155",textAlign:"center",fontSize:"13px",marginTop:"20px"}},"No orders yet"));
+    orders.forEach(order=>{
+      const card=el("div",{class:"card"});const st=order.status||"open";const barcodes=(order.items||"").split(",").filter(b=>b.trim());
+      const statusColors={"transit":"#fbbf24","received":"#86efac","open":"#38bdf8"};const statusBgs={"transit":"#78350f","received":"#14532d","open":"#0f172a"};
+      card.innerHTML='<div style="display:flex;justify-content:space-between;align-items:flex-start"><div><div style="font-weight:700;color:#f1f5f9;font-size:14px">'+(order.name||order.id)+'</div><div style="color:#64748b;font-size:11px;font-family:monospace;margin-top:2px">'+order.id+'</div><div style="color:#64748b;font-size:11px;margin-top:2px">Items: '+barcodes.length+' · By: '+order.createdBy+'</div></div><span class="badge" style="background:'+(statusBgs[st]||"#1e293b")+';color:'+(statusColors[st]||"#64748b")+'">'+st.toUpperCase()+'</span></div><div style="color:#64748b;font-size:11px;margin-top:6px">'+(order.createdAt?formatDate(order.createdAt):"")+'</div>';
+      content.appendChild(card);
+    });
   }
-
-  return null;
+  if(tab==="log"){
+    const displayLog=admin?S.log:S.log.filter(e=>e.user===profile.displayName||e.from===owners.find(o=>o.id===profile.ownerId)?.name||e.to===owners.find(o=>o.id===profile.ownerId)?.name);
+    if(displayLog.length===0)content.appendChild(el("p",{style:{color:"#334155",textAlign:"center",fontSize:"13px",marginTop:"30px"}},"No activity yet"));
+    const colors={CHECK_IN:"#22c55e",CHECK_OUT:"#f59e0b",TRANSFER:"#6366f1"};const icons={CHECK_IN:"📥",CHECK_OUT:"📤",TRANSFER:"🔄"};
+    displayLog.forEach(entry=>{
+      const card=el("div",{style:{background:"#111827",borderRadius:"10px",padding:"11px 14px",marginBottom:"7px",border:"1px solid #1e293b",display:"flex",gap:"12px"}});
+      card.innerHTML='<span style="font-size:20px">'+(icons[entry.action]||"📋")+'</span><div style="flex:1"><div style="display:flex;justify-content:space-between"><span style="color:'+(colors[entry.action]||"#94a3b8")+';font-weight:700;font-size:12px">'+(entry.action?.replace(/_/g," "))+'</span><span style="color:#334155;font-size:11px">'+(entry.ts?formatDate(entry.ts):"")+'</span></div><div style="color:#f1f5f9;font-size:13px;margin-top:2px">'+(entry.itemName||"")+'</div><div style="display:flex;gap:10px;margin-top:3px"><span style="color:#64748b;font-size:11px;font-family:monospace">'+(entry.barcode||"")+'</span><span style="color:#475569;font-size:11px">by '+(entry.user||"")+'</span></div>'+(entry.action==="TRANSFER"?'<div style="color:#818cf8;font-size:11px;margin-top:2px">'+entry.from+' → '+entry.to+'</div>':"")+(entry.action==="CHECK_OUT"?'<div style="color:#fb923c;font-size:11px;margin-top:2px">from '+entry.from+' → Used</div>':"")+(entry.action==="CHECK_IN"&&entry.from?.startsWith("ORD-")?'<div style="color:#818cf8;font-size:11px;margin-top:2px">Order: '+entry.from+'</div>':"")+'</div>';
+      content.appendChild(card);
+    });
+  }
+  wrap.appendChild(content);return wrap;
 }
 
-// ── AUTH ERROR MESSAGES ───────────────────────────────────────────────────────
-function friendlyError(code){
-  const map={
-    "auth/invalid-email":"Please enter a valid email.",
-    "auth/user-not-found":"No account found with that email.",
-    "auth/wrong-password":"Incorrect password.",
-    "auth/invalid-credential":"Incorrect email or password.",
-    "auth/email-already-in-use":"An account with that email already exists.",
-    "auth/weak-password":"Password must be at least 6 characters.",
-    "auth/too-many-requests":"Too many attempts. Please wait and try again.",
-    "auth/network-request-failed":"Network error. Check your connection.",
+function renderScanner(){
+  const div=el("div",{style:{position:"fixed",inset:"0",background:"rgba(10,15,28,0.98)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",zIndex:"800",gap:"14px",padding:"20px 16px"}});
+  if(S.showMultiScan&&S.multiCodes.length>0){const counter=el("div",{style:{background:"#0ea5e918",border:"1px solid #0ea5e933",borderRadius:"10px",padding:"10px 20px",textAlign:"center"}});counter.innerHTML='<span style="color:#38bdf8;font-weight:700;font-size:16px">📦 '+S.multiCodes.length+' code'+(S.multiCodes.length>1?"s":"")+" scanned</span>";div.appendChild(counter);}
+  const status=el("p",{id:"scan-status",style:{color:"#7dd3fc",fontSize:"13px",margin:"0",textAlign:"center",fontFamily:"monospace"}},S.showMultiScan?"Scan next code or tap Done":"Starting camera…");
+  div.appendChild(status);
+  const videoWrap=el("div",{style:{position:"relative",width:"100%",maxWidth:"320px",borderRadius:"16px",overflow:"hidden",border:"2px solid #0ea5e9"}});
+  const video=el("video",{id:"scan-video",autoplay:"",playsinline:"",muted:"",style:{width:"100%",display:"block",background:"#000",minHeight:"240px"}});
+  const canvas=el("canvas",{id:"scan-canvas",style:{display:"none"}});
+  const overlay=el("div",{style:{position:"absolute",inset:"0",display:"flex",alignItems:"center",justifyContent:"center",pointerEvents:"none"}});
+  const box=el("div",{style:{width:"160px",height:"160px",border:"3px solid #0ea5e9",borderRadius:"12px",boxShadow:"0 0 0 9999px rgba(0,0,0,0.5)"}});
+  overlay.appendChild(box);videoWrap.appendChild(video);videoWrap.appendChild(canvas);videoWrap.appendChild(overlay);div.appendChild(videoWrap);
+  const mi=el("input",{type:"text",placeholder:"Or type code here…",style:{maxWidth:"320px",textAlign:"center"}});
+  mi.onkeydown=function(e){if(e.key==="Enter"&&this.value.trim()){handleScan(this.value.trim());this.value="";}};div.appendChild(mi);
+  if(S.showOrderItemScan){
+    const cb=document.createElement("div");cb.style.cssText="background:#6366f118;border:1px solid #6366f133;border-radius:10px;padding:8px 16px;text-align:center;width:100%;max-width:320px;";cb.innerHTML="<span style='color:#818cf8;font-weight:700;font-size:15px'>🗃 "+S.orderItems.length+" item"+(S.orderItems.length!==1?"s":"")+" added to order</span>";div.appendChild(cb);
+    const db=el("button",{class:"btn btn-green",style:{maxWidth:"320px",marginTop:"4px"}},"Done Adding Items → Scan Order QR");
+    db.onclick=()=>{if(S.orderItems.length===0){showToast("Scan at least one item","warn");return;}stopScanner();setState({scanning:true,showOrderItemScan:false,showOrderQRScan:true,scanHint:"Scan the Order QR code to finalize"});};div.appendChild(db);
+  }
+  if(S.showMultiScan){const db=el("button",{class:"btn btn-green",style:{maxWidth:"320px",marginTop:"4px"}},"Done Scanning ("+S.multiCodes.length+" codes)");db.onclick=()=>{stopScanner();setState({scanning:false,showMultiScan:false,showMultiConfirm:true});};div.appendChild(db);}
+  const cancelBtn=el("button",{style:{padding:"12px 32px",borderRadius:"9px",background:"transparent",color:"#94a3b8",border:"1px solid #334155",fontSize:"14px",width:"100%",maxWidth:"320px"}},"Cancel");
+  cancelBtn.onclick=()=>{stopScanner();setState({scanning:false,scanMode:null,multiMode:false,showMultiScan:false,multiCodes:[],multiDetails:null,showOrderItemScan:false,showOrderQRScan:false});};div.appendChild(cancelBtn);return div;
+}
+function renderScanPrompt(){
+  const div=el("div",{class:"overlay-center"});
+  const card=el("div",{style:{width:"100%",maxWidth:"360px",background:"#111827",borderRadius:"20px",padding:"24px",border:"1px solid #1e293b"}});
+  card.innerHTML='<h2 style="color:#f1f5f9;font-size:18px;font-weight:700;margin:0 0 6px;text-align:center">How many items?</h2><p style="color:#64748b;font-size:13px;text-align:center;margin:0 0 20px">Choose check-in mode</p>';
+  [["single","1️⃣","Single Item","Scan one item","#22c55e"],["multi","📦","Multiple Items","Enter details once, scan all codes","#0ea5e9"]].forEach(([mode,icon,label,sub,color])=>{
+    const btn=el("button",{style:{width:"100%",padding:"14px 16px",borderRadius:"12px",border:"1px solid "+color+"33",background:color+"18",color,fontWeight:"700",fontSize:"15px",display:"flex",alignItems:"center",gap:"12px",marginBottom:"10px",textAlign:"left"}});
+    btn.innerHTML='<span style="font-size:26px">'+icon+'</span><div><div>'+label+'</div><div style="font-size:11px;font-weight:400;opacity:.7;margin-top:2px">'+sub+'</div></div>';
+    btn.onclick=()=>{setState({showScanPrompt:false});if(mode==="single")setState({multiMode:false,scanning:true,scanHint:"Point camera at QR code"});else setState({multiMode:true,multiCodes:[],multiDetails:null,showMultiDetails:true});};card.appendChild(btn);
+  });
+  const cb=el("button",{style:{width:"100%",padding:"12px",borderRadius:"9px",border:"1px solid #334155",background:"transparent",color:"#64748b",fontSize:"14px"}},"Cancel");cb.onclick=()=>setState({showScanPrompt:false});card.appendChild(cb);div.appendChild(card);return div;
+}
+function renderMultiDetails(){
+  let name="",type="",expDate="";
+  const div=el("div",{class:"overlay"});const inner=el("div",{class:"overlay-inner"});
+  const tr=el("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"20px"}});tr.innerHTML='<h2 style="color:#f1f5f9;font-size:18px;font-weight:700;margin:0">Item Details</h2>';
+  const cb=el("button",{style:{background:"none",border:"none",color:"#475569",fontSize:"24px",cursor:"pointer"}},"✕");cb.onclick=()=>setState({showMultiDetails:false,multiMode:false,multiCodes:[],scanMode:null});tr.appendChild(cb);inner.appendChild(tr);
+  inner.appendChild(el("p",{style:{color:"#64748b",fontSize:"13px",margin:"0 0 20px"}},"Enter details once — they'll apply to all scanned items."));
+  const sn1=el("select");sn1.appendChild(el("option",{value:""},"Select item…"));["DFX","DFXM","BTFT","DTF-31","DTF-31Q","DTF-18","DTF-40","DTFD-13","DTFD-24","BVNA","RF UNIT","IntraVu","IntraVu Monitor"].forEach(i=>sn1.appendChild(el("option",{value:i},i)));sn1.onchange=function(){name=this.value;};
+  inner.appendChild(el("label",{class:"label"},"Item Name"));inner.appendChild(sn1);inner.appendChild(el("div",{style:{height:"14px"}}));
+  const sn2=el("select");sn2.appendChild(el("option",{value:""},"Select type…"));["Disposable","Capital Equipment"].forEach(t=>sn2.appendChild(el("option",{value:t},t)));sn2.onchange=function(){type=this.value;};
+  inner.appendChild(el("label",{class:"label"},"Equipment Type"));inner.appendChild(sn2);inner.appendChild(el("div",{style:{height:"14px"}}));
+  const in3=el("input",{type:"date"});in3.oninput=function(){expDate=this.value;};
+  inner.appendChild(el("label",{class:"label"},"Expiration Date"));inner.appendChild(in3);inner.appendChild(el("div",{style:{height:"14px"}}));
+  const nb=el("button",{class:"btn btn-green"},"Next — Scan QR Codes →");
+  nb.onclick=()=>{if(!name){showToast("Enter item name","warn");return;}setState({showMultiDetails:false,showMultiScan:true,multiDetails:{name,type,expDate},scanning:true,scanHint:"Scan QR codes — tap Done when finished"});};
+  inner.appendChild(nb);div.appendChild(inner);return div;
+}
+function renderMultiScan(){}
+function renderMultiConfirm(){
+  const{multiDetails,multiCodes}=S;
+  const div=el("div",{class:"overlay"});const inner=el("div",{class:"overlay-inner"});
+  inner.innerHTML='<h2 style="color:#f1f5f9;font-size:18px;font-weight:700;margin:0 0 16px">Confirm Check In</h2>';
+  const summary=el("div",{style:{background:"#0f172a",borderRadius:"10px",padding:"14px",marginBottom:"16px",border:"1px solid #1e293b"}});
+  summary.innerHTML='<p style="color:#94a3b8;font-size:12px;margin:0 0 8px;text-transform:uppercase;letter-spacing:.05em;font-weight:600">Item Details</p><p style="color:#f1f5f9;font-size:15px;font-weight:700;margin:0 0 4px">'+multiDetails.name+'</p><p style="color:#64748b;font-size:13px;margin:0 0 2px">Type: '+(multiDetails.type||"—")+'</p><p style="color:#64748b;font-size:13px;margin:0">Exp: '+(multiDetails.expDate||"—")+'</p>';
+  inner.appendChild(summary);
+  const cb=el("div",{style:{background:"#0ea5e918",border:"1px solid #0ea5e933",borderRadius:"10px",padding:"14px",marginBottom:"16px",textAlign:"center"}});
+  cb.innerHTML='<div style="color:#38bdf8;font-size:32px;font-weight:800">'+multiCodes.length+'</div><div style="color:#7dd3fc;font-size:14px;margin-top:4px">item'+(multiCodes.length!==1?"s":"")+" to check in</div>";inner.appendChild(cb);
+  const cl=el("div",{style:{background:"#0f172a",borderRadius:"10px",padding:"12px",marginBottom:"20px",maxHeight:"180px",overflowY:"auto"}});
+  cl.innerHTML='<p style="color:#94a3b8;font-size:11px;font-weight:600;margin:0 0 8px;text-transform:uppercase;letter-spacing:.05em">Scanned Codes</p>';
+  multiCodes.forEach((code,i)=>{const row=el("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"4px 0",borderBottom:i<multiCodes.length-1?"1px solid #1e293b":"none"}});row.innerHTML='<span style="color:#94a3b8;font-size:12px;font-family:monospace">'+code+'</span>';const rb=el("button",{style:{background:"none",border:"none",color:"#475569",fontSize:"14px",cursor:"pointer",padding:"2px 6px"}},"✕");rb.onclick=()=>{setState({multiCodes:S.multiCodes.filter(c=>c!==code)});};row.appendChild(rb);cl.appendChild(row);});
+  inner.appendChild(cl);
+  const pool=S.owners.find(o=>o.id.toUpperCase()==="POOL")||S.owners[0];
+  inner.appendChild(el("p",{style:{color:"#475569",fontSize:"12px",margin:"0 0 16px",textAlign:"center"}},"All items → 🏪 "+(pool?.name||"General Pool")));
+  const cfb=el("button",{class:"btn btn-green",style:{marginBottom:"10px"}},"✅ Confirm — Check In "+multiCodes.length+" Item"+(multiCodes.length!==1?"s":""));cfb.onclick=submitMultiCheckin;inner.appendChild(cfb);
+  const bb=el("button",{class:"btn btn-dark",style:{marginBottom:"10px"}},"← Scan More Codes");bb.onclick=()=>setState({showMultiConfirm:false,showMultiScan:true,scanning:true,scanHint:"Scan QR codes — tap Done when finished"});inner.appendChild(bb);
+  const xb=el("button",{class:"btn",style:{background:"transparent",border:"1px solid #334155",color:"#64748b"}},"Cancel");xb.onclick=()=>setState({showMultiConfirm:false,multiMode:false,multiCodes:[],multiDetails:null,scanMode:null});inner.appendChild(xb);
+  div.appendChild(inner);return div;
+}
+function renderOrderGen(){
+  const div=el("div",{class:"overlay"});const inner=el("div",{class:"overlay-inner"});
+  const tr=el("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"20px"}});tr.innerHTML='<h2 style="color:#f1f5f9;font-size:18px;font-weight:700;margin:0">Create Order QR</h2>';
+  const cb=el("button",{style:{background:"none",border:"none",color:"#475569",fontSize:"24px",cursor:"pointer"}},"✕");cb.onclick=()=>{setState({showOrderGen:false});loadData();};tr.appendChild(cb);inner.appendChild(tr);
+  let orderName="";
+  inner.appendChild(el("label",{class:"label"},"Order Name"));const ni=el("input",{type:"text",placeholder:"e.g. Shipment Jan 2026"});ni.oninput=e=>orderName=e.target.value;inner.appendChild(ni);inner.appendChild(el("div",{style:{height:"16px"}}));
+  const qd=el("div",{id:"order-qr-result",style:{display:"none",textAlign:"center"}});inner.appendChild(qd);
+  const gb=el("button",{class:"btn btn-purple"},"Generate Order QR →");
+  gb.onclick=async()=>{
+    if(!orderName){showToast("Enter order name","warn");return;}gb.textContent="Creating…";gb.disabled=true;
+    const orderId="ORD-"+Date.now(),now=new Date().toISOString();
+    try{
+      await addOrder({id:orderId,name:orderName,count:0,createdBy:getProfile().displayName,createdAt:now,status:"open",items:""});
+      qd.style.display="block";qd.innerHTML='<p style="color:#4ade80;font-weight:700;margin:0 0 4px">✅ Order Created!</p><p style="color:#94a3b8;font-size:13px;margin:0 0 16px">'+orderName+'</p><div id="oqr" style="display:inline-block;background:#fff;padding:12px;border-radius:10px;margin-bottom:12px"></div><p style="color:#64748b;font-size:11px;font-family:monospace;margin:0 0 16px">'+orderId+'</p>';
+      if(window.QRCode)new window.QRCode(document.getElementById("oqr"),{text:orderId,width:160,height:160});
+      const pb=el("button",{class:"btn btn-primary",style:{marginBottom:"10px"}},"🖨 Print QR Code");
+      pb.onclick=()=>{const pa=document.getElementById("print-area");pa.style.display="block";pa.innerHTML='<h2 style="font-family:sans-serif">'+orderName+'</h2><div>'+document.getElementById("oqr").innerHTML+'</div><p style="font-family:monospace;font-size:12px">'+orderId+'</p>';window.print();pa.style.display="none";};
+      qd.appendChild(pb);gb.style.display="none";showToast("Order created!");
+    }catch(e){showToast("Failed to create order","err");gb.textContent="Generate Order QR →";gb.disabled=false;}
   };
-  return map[code]||"Something went wrong. Please try again.";
+  inner.appendChild(gb);div.appendChild(inner);return div;
 }
-
-// ── INIT ──────────────────────────────────────────────────────────────────────
+function renderOrderSummary(){
+  const{orderItems,pendingOrderQR,items}=S;
+  const page=document.createElement("div");page.style.cssText="position:fixed;inset:0;background:#0a0f1c;z-index:1000;overflow-y:auto;-webkit-overflow-scrolling:touch;";
+  const inner=document.createElement("div");inner.style.cssText="max-width:480px;margin:0 auto;padding:24px 20px;";
+  const hdr=document.createElement("div");hdr.style.cssText="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;padding-top:8px;";
+  const title=document.createElement("h2");title.style.cssText="color:#f1f5f9;font-size:20px;font-weight:700;margin:0;";title.textContent="Confirm Order";
+  const xBtn=document.createElement("button");xBtn.style.cssText="background:#1e293b;border:1px solid #334155;color:#94a3b8;font-size:18px;border-radius:8px;padding:8px 12px;cursor:pointer;font-family:inherit;";xBtn.textContent="✕ Cancel";xBtn.onclick=function(){setState({showOrderSummary:false,orderItems:[],pendingOrderQR:null});};
+  hdr.appendChild(title);hdr.appendChild(xBtn);inner.appendChild(hdr);
+  let orderName="";const nl=document.createElement("div");nl.style.cssText="color:#94a3b8;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;";nl.textContent="Order Name";
+  const ni=document.createElement("input");ni.type="text";ni.placeholder="e.g. Shipment to Charlie, June Restock…";ni.style.cssText="width:100%;background:#0f172a;border:1px solid #334155;border-radius:9px;color:#f1f5f9;padding:11px 14px;font-size:15px;font-family:inherit;margin-bottom:16px;box-sizing:border-box;";ni.oninput=function(){orderName=this.value;};inner.appendChild(nl);inner.appendChild(ni);
+  const qc=document.createElement("div");qc.style.cssText="background:#6366f118;border:1px solid #6366f133;border-radius:12px;padding:16px;margin-bottom:16px;";qc.innerHTML="<div style='color:#818cf8;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px'>Order QR Code</div><div style='color:#c084fc;font-weight:700;font-size:15px;font-family:monospace'>"+pendingOrderQR+"</div>";inner.appendChild(qc);
+  const cc=document.createElement("div");cc.style.cssText="background:#0ea5e918;border:1px solid #0ea5e933;border-radius:12px;padding:20px;margin-bottom:16px;text-align:center;";cc.innerHTML="<div style='color:#38bdf8;font-size:40px;font-weight:800'>"+orderItems.length+"</div><div style='color:#7dd3fc;font-size:14px;margin-top:4px'>item"+(orderItems.length!==1?"s":"")+" will move to In Transit</div>";inner.appendChild(cc);
+  const lc=document.createElement("div");lc.style.cssText="background:#111827;border-radius:12px;border:1px solid #1e293b;padding:14px;margin-bottom:20px;max-height:200px;overflow-y:auto;";const lt=document.createElement("div");lt.style.cssText="color:#94a3b8;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;";lt.textContent="Items in Order";lc.appendChild(lt);
+  orderItems.forEach(function(barcode){const item=items.find(i=>i.barcode===barcode);const row=document.createElement("div");row.style.cssText="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #1e293b;";row.innerHTML="<span style='color:#f1f5f9;font-size:13px'>"+(item?item.name:barcode)+"</span><span style='color:#64748b;font-size:11px;font-family:monospace'>"+barcode+"</span>";lc.appendChild(row);});inner.appendChild(lc);
+  const cb=document.createElement("button");cb.textContent="✓ Create Order & Move to Transit";cb.style.cssText="width:100%;padding:18px;border-radius:12px;border:none;background:linear-gradient(135deg,#6366f1,#4f46e5);color:#fff;font-weight:700;font-size:17px;cursor:pointer;display:block;font-family:inherit;margin-bottom:12px;";cb.onclick=function(){submitOrderCreate(pendingOrderQR,orderItems,orderName||pendingOrderQR);};inner.appendChild(cb);
+  const bb=document.createElement("button");bb.textContent="← Scan More Items";bb.style.cssText="width:100%;padding:14px;border-radius:12px;border:1px solid #334155;background:#1e293b;color:#94a3b8;font-weight:600;font-size:15px;cursor:pointer;display:block;font-family:inherit;margin-bottom:10px;";bb.onclick=function(){setState({showOrderSummary:false,showOrderItemScan:true,scanning:true,scanHint:"Scan items to add to order"});};inner.appendChild(bb);
+  const xb=document.createElement("button");xb.textContent="Cancel Order";xb.style.cssText="width:100%;padding:14px;border-radius:12px;border:1px solid #dc2626;background:transparent;color:#f87171;font-weight:600;font-size:15px;cursor:pointer;display:block;font-family:inherit;";xb.onclick=function(){setState({showOrderSummary:false,orderItems:[],pendingOrderQR:null,showOrderItemScan:false,showOrderQRScan:false});};inner.appendChild(xb);
+  page.appendChild(inner);return page;
+}
+function renderTransferPage(modal,owners){
+  const item=modal.item,admin=isAdmin(),profile=getProfile();const fromName=owners.find(o=>o.id===item.ownerId)?.name||item.ownerId;const userOwner=owners.find(o=>o.id===profile.ownerId);
+  const page=document.createElement("div");page.style.cssText="position:fixed;inset:0;background:#0a0f1c;z-index:1000;overflow-y:auto;-webkit-overflow-scrolling:touch;";const inner=document.createElement("div");inner.style.cssText="max-width:480px;margin:0 auto;padding:24px 20px;";
+  const hdr=document.createElement("div");hdr.style.cssText="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;padding-top:8px;";const title=document.createElement("h2");title.style.cssText="color:#f1f5f9;font-size:20px;font-weight:700;margin:0;";title.textContent="Transfer Item";const xBtn=document.createElement("button");xBtn.style.cssText="background:#1e293b;border:1px solid #334155;color:#94a3b8;font-size:18px;border-radius:8px;padding:8px 12px;cursor:pointer;font-family:inherit;";xBtn.textContent="✕ Cancel";xBtn.onclick=function(){setState({modal:null});};hdr.appendChild(title);hdr.appendChild(xBtn);inner.appendChild(hdr);
+  const ic=document.createElement("div");ic.style.cssText="background:#111827;border-radius:12px;border:1px solid #1e293b;padding:16px;margin-bottom:16px;";ic.innerHTML="<div style='color:#94a3b8;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px'>Item</div><div style='color:#f1f5f9;font-weight:700;font-size:16px;margin-bottom:4px'>"+item.name+"</div><div style='color:#64748b;font-size:12px;font-family:monospace'>"+item.barcode+"</div>";inner.appendChild(ic);
+  const fc=document.createElement("div");fc.style.cssText="background:#0f172a;border-radius:12px;border:1px solid #334155;padding:16px;margin-bottom:16px;";fc.innerHTML="<div style='color:#94a3b8;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px'>From</div><div style='color:#38bdf8;font-weight:700;font-size:16px'>"+fromName+"</div>";inner.appendChild(fc);
+  const tl=document.createElement("div");tl.style.cssText="color:#94a3b8;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;";tl.textContent="Transfer To";inner.appendChild(tl);
+  const validOwners=owners.filter(o=>o.id!==item.ownerId&&o.id!=="USED");let destOwnerId=admin?(validOwners[0]?.id||""):profile.ownerId;
+  if(admin){const sel=document.createElement("select");sel.style.cssText="width:100%;background:#0f172a;border:1px solid #334155;border-radius:9px;color:#f1f5f9;padding:14px;font-size:15px;margin-bottom:24px;font-family:inherit;box-sizing:border-box;";validOwners.forEach(function(o){const icon=o.id.toUpperCase()==="POOL"?"🏪":o.type==="locker"?"🗄":"👤";const opt=document.createElement("option");opt.value=o.id;opt.textContent=icon+" "+o.name;sel.appendChild(opt);});if(sel.options.length>0)sel.value=destOwnerId;sel.onchange=function(){destOwnerId=this.value;};inner.appendChild(sel);}
+  else{const dc=document.createElement("div");dc.style.cssText="background:#0f172a;border-radius:12px;border:1px solid #0ea5e9;padding:16px;margin-bottom:24px;";dc.innerHTML="<div style='color:#38bdf8;font-weight:700;font-size:16px'>👤 "+(userOwner?.name||profile.displayName)+"</div><div style='color:#475569;font-size:12px;margin-top:4px'>Your inventory</div>";inner.appendChild(dc);}
+  const cfb=document.createElement("button");cfb.textContent="✓ Confirm Transfer";cfb.style.cssText="width:100%;padding:18px;border-radius:12px;border:none;background:#6366f1;color:#fff;font-weight:700;font-size:17px;cursor:pointer;display:block;font-family:inherit;margin-bottom:12px;-webkit-appearance:none;";cfb.onclick=function(){const dest=destOwnerId;if(!dest){showToast("Please select a destination","warn");return;}if(dest===item.ownerId){showToast("Item is already in this inventory","warn");return;}submitTransfer(item,dest);};inner.appendChild(cfb);
+  const cb2=document.createElement("button");cb2.textContent="Cancel";cb2.style.cssText="width:100%;padding:14px;border-radius:12px;border:1px solid #334155;background:#1e293b;color:#94a3b8;font-weight:600;font-size:15px;cursor:pointer;display:block;font-family:inherit;-webkit-appearance:none;";cb2.onclick=function(){setState({modal:null});};inner.appendChild(cb2);
+  page.appendChild(inner);return page;
+}
+function renderModal(){
+  const{modal,owners}=S;
+  if(modal.type==="transfer")return renderTransferPage(modal,owners);
+  const div=document.createElement("div");div.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.85);display:flex;align-items:flex-end;justify-content:center;z-index:500;";div.onclick=function(e){if(e.target===div)setState({modal:null});};
+  const inner=document.createElement("div");inner.style.cssText="width:100%;max-width:480px;background:#111827;border-radius:20px 20px 0 0;padding:24px 20px 48px;border:1px solid #1e293b;max-height:85vh;overflow-y:auto;-webkit-overflow-scrolling:touch;";inner.onclick=function(e){e.stopPropagation();};
+  if(modal.type==="checkin"){
+    const pool=owners.find(o=>o.id.toUpperCase()==="POOL")||owners[0];
+    const hdr=document.createElement("div");hdr.style.cssText="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;";const title=document.createElement("h2");title.style.cssText="color:#f1f5f9;font-size:18px;font-weight:700;margin:0;";title.textContent="Check In Equipment";const xBtn=document.createElement("button");xBtn.style.cssText="background:none;border:none;color:#475569;font-size:24px;cursor:pointer;padding:4px 8px;";xBtn.textContent="✕";xBtn.onclick=function(){setState({modal:null});};hdr.appendChild(title);hdr.appendChild(xBtn);inner.appendChild(hdr);
+    const bp=document.createElement("p");bp.style.cssText="color:#64748b;font-size:12px;font-family:monospace;margin:0 0 16px;";bp.textContent="Barcode: "+modal.barcode;inner.appendChild(bp);
+    let name="",type="",expDate="";
+    const n1=document.createElement("label");n1.style.cssText="color:#94a3b8;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:6px;";n1.textContent="Item Name";
+    const i1=document.createElement("select");i1.style.cssText="width:100%;background:#0f172a;border:1px solid #334155;border-radius:9px;color:#f1f5f9;padding:11px 14px;font-size:15px;font-family:inherit;margin-bottom:14px;box-sizing:border-box;-webkit-appearance:none;";const d1=document.createElement("option");d1.value="";d1.textContent="Select item…";i1.appendChild(d1);["DFX","DFXM","BTFT","DTF-31","DTF-31Q","DTF-18","DTF-40","DTFD-13","DTFD-24","BVNA","RF UNIT","IntraVu","IntraVu Monitor"].forEach(function(item){const o=document.createElement("option");o.value=item;o.textContent=item;i1.appendChild(o);});i1.onchange=function(){name=this.value;};inner.appendChild(n1);inner.appendChild(i1);
+    const n2=document.createElement("label");n2.style.cssText="color:#94a3b8;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:6px;";n2.textContent="Equipment Type";const i2=document.createElement("select");i2.style.cssText="width:100%;background:#0f172a;border:1px solid #334155;border-radius:9px;color:#f1f5f9;padding:11px 14px;font-size:15px;font-family:inherit;margin-bottom:14px;box-sizing:border-box;-webkit-appearance:none;";const d2=document.createElement("option");d2.value="";d2.textContent="Select type…";i2.appendChild(d2);["Disposable","Capital Equipment"].forEach(function(t){const o=document.createElement("option");o.value=t;o.textContent=t;i2.appendChild(o);});i2.onchange=function(){type=this.value;};inner.appendChild(n2);inner.appendChild(i2);
+    const n3=document.createElement("label");n3.style.cssText="color:#94a3b8;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:6px;";n3.textContent="Expiration Date";const i3=document.createElement("input");i3.type="date";i3.style.cssText="width:100%;background:#0f172a;border:1px solid #334155;border-radius:9px;color:#f1f5f9;padding:11px 14px;font-size:15px;font-family:inherit;margin-bottom:14px;box-sizing:border-box;";i3.oninput=function(){expDate=this.value;};inner.appendChild(n3);inner.appendChild(i3);
+    const n4=document.createElement("label");n4.style.cssText="color:#94a3b8;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:6px;";n4.textContent="Assign To";const db=document.createElement("div");db.style.cssText="padding:11px 14px;border-radius:9px;border:1px solid #334155;background:#0f172a;color:#38bdf8;font-size:15px;font-weight:600;margin-bottom:6px;";db.textContent="🏪 "+(pool?.name||"General Pool");const dn=document.createElement("p");dn.style.cssText="color:#475569;font-size:11px;margin:0 0 20px;";dn.textContent="All items go to General Pool first.";inner.appendChild(n4);inner.appendChild(db);inner.appendChild(dn);
+    const sb=document.createElement("button");sb.textContent="Confirm Check In";sb.style.cssText="width:100%;padding:16px;border-radius:10px;border:none;background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff;font-weight:700;font-size:16px;cursor:pointer;display:block;font-family:inherit;-webkit-appearance:none;";
+    sb.onclick=function(){if(!name){showToast("Enter item name","warn");return;}if(!pool){showToast("No pool found","err");return;}setState({modal:null,loading:false});showToast("✅ "+name+" → "+(pool?.name||"Pool"));submitCheckin(modal.barcode,name,type,expDate,pool.id).catch(e=>console.error(e));};inner.appendChild(sb);
+  }
+  if(modal.type==="checkout"){
+    const hdr=document.createElement("div");hdr.style.cssText="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;";const title=document.createElement("h2");title.style.cssText="color:#f1f5f9;font-size:18px;font-weight:700;margin:0;";title.textContent="Check Out Item";const xBtn=document.createElement("button");xBtn.style.cssText="background:none;border:none;color:#475569;font-size:24px;cursor:pointer;padding:4px 8px;";xBtn.textContent="✕";xBtn.onclick=function(){setState({modal:null});};hdr.appendChild(title);hdr.appendChild(xBtn);inner.appendChild(hdr);
+    const bp=document.createElement("p");bp.style.cssText="color:#94a3b8;font-size:14px;margin-bottom:8px;";bp.textContent="Check out and mark as Used:";const np=document.createElement("p");np.style.cssText="color:#f1f5f9;font-weight:700;font-size:16px;margin-bottom:4px;";np.textContent=modal.item.name;const bcp=document.createElement("p");bcp.style.cssText="color:#64748b;font-size:12px;font-family:monospace;margin-bottom:24px;";bcp.textContent=modal.item.barcode;inner.appendChild(bp);inner.appendChild(np);inner.appendChild(bcp);
+    const cfb=document.createElement("button");cfb.textContent="✅ Confirm — Move to Used";cfb.style.cssText="width:100%;padding:16px;border-radius:10px;border:none;background:#f59e0b;color:#fff;font-weight:700;font-size:16px;cursor:pointer;display:block;font-family:inherit;margin-bottom:10px;-webkit-appearance:none;";cfb.onclick=function(){setState({modal:null});submitCheckout(modal.item);};inner.appendChild(cfb);
+    const cb=document.createElement("button");cb.textContent="Cancel";cb.style.cssText="width:100%;padding:13px;border-radius:10px;border:1px solid #334155;background:#1e293b;color:#94a3b8;font-weight:600;font-size:14px;cursor:pointer;display:block;font-family:inherit;-webkit-appearance:none;";cb.onclick=function(){setState({modal:null});};inner.appendChild(cb);
+  }
+  if(modal.type==="receive_order"){
+    const order=modal.order,barcodes=modal.barcodes,admin=isAdmin();
+    const hdr=document.createElement("div");hdr.style.cssText="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;padding-top:8px;";const title=document.createElement("h2");title.style.cssText="color:#f1f5f9;font-size:20px;font-weight:700;margin:0;";title.textContent="Receive Order";const xBtn=document.createElement("button");xBtn.style.cssText="background:#1e293b;border:1px solid #334155;color:#94a3b8;font-size:18px;border-radius:8px;padding:8px 12px;cursor:pointer;font-family:inherit;";xBtn.textContent="✕ Cancel";xBtn.onclick=function(){setState({modal:null});};hdr.appendChild(title);hdr.appendChild(xBtn);inner.appendChild(hdr);
+    const ic=document.createElement("div");ic.style.cssText="background:#111827;border-radius:12px;border:1px solid #6366f1;padding:16px;margin-bottom:16px;";ic.innerHTML="<div style='color:#818cf8;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px'>📦 Order</div><div style='color:#f1f5f9;font-weight:700;font-size:16px;margin-bottom:4px'>"+(order.name||order.id)+"</div><div style='color:#64748b;font-size:12px;font-family:monospace;margin-bottom:4px'>"+order.id+"</div><div style='color:#64748b;font-size:12px'>Created by: "+order.createdBy+"</div>";inner.appendChild(ic);
+    const cc=document.createElement("div");cc.style.cssText="background:#0ea5e918;border:1px solid #0ea5e933;border-radius:12px;padding:20px;margin-bottom:16px;text-align:center;";cc.innerHTML="<div style='color:#38bdf8;font-size:40px;font-weight:800'>"+barcodes.length+"</div><div style='color:#7dd3fc;font-size:14px;margin-top:4px'>item"+(barcodes.length!==1?"s":"")+" will move to your inventory</div>";inner.appendChild(cc);
+    let destOwnerId=admin?"":getProfile().ownerId;
+    if(admin){const tl=document.createElement("div");tl.style.cssText="color:#94a3b8;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;";tl.textContent="Receive Into";const validOwners=S.owners.filter(o=>o.id.toUpperCase()!=="TRANSIT"&&o.id.toUpperCase()!=="USED");destOwnerId=validOwners[0]?.id||"";const sel=document.createElement("select");sel.style.cssText="width:100%;background:#0f172a;border:1px solid #334155;border-radius:9px;color:#f1f5f9;padding:14px;font-size:15px;margin-bottom:20px;font-family:inherit;box-sizing:border-box;";validOwners.forEach(function(o){const icon=o.type==="locker"?"🗄":"👤";const opt=document.createElement("option");opt.value=o.id;opt.textContent=icon+" "+o.name;sel.appendChild(opt);});sel.value=destOwnerId;sel.onchange=function(){destOwnerId=this.value;};inner.appendChild(tl);inner.appendChild(sel);}
+    else{const dc=document.createElement("div");dc.style.cssText="background:#0f172a;border-radius:12px;border:1px solid #0ea5e9;padding:16px;margin-bottom:20px;";const uo=S.owners.find(o=>o.id===getProfile().ownerId);dc.innerHTML="<div style='color:#94a3b8;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px'>Receive Into</div><div style='color:#38bdf8;font-weight:700;font-size:16px'>👤 "+(uo?.name||getProfile().displayName)+"</div>";inner.appendChild(dc);}
+    const cfb=document.createElement("button");cfb.textContent="✓ Confirm — Receive All Items";cfb.style.cssText="width:100%;padding:18px;border-radius:12px;border:none;background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff;font-weight:700;font-size:17px;cursor:pointer;display:block;font-family:inherit;margin-bottom:12px;";cfb.onclick=function(){if(!destOwnerId){showToast("Select destination","warn");return;}submitOrderReceive(order.id,destOwnerId);};inner.appendChild(cfb);
+    const cb=document.createElement("button");cb.textContent="Cancel";cb.style.cssText="width:100%;padding:14px;border-radius:12px;border:1px solid #334155;background:#1e293b;color:#94a3b8;font-weight:600;font-size:15px;cursor:pointer;display:block;font-family:inherit;";cb.onclick=function(){setState({modal:null});};inner.appendChild(cb);
+  }
+  if(modal.type==="undo_checkout"){
+    const item=modal.item;const div2=el("div",{class:"overlay"});const inner2=el("div",{class:"overlay-inner"});
+    const tr=document.createElement("div");tr.style.cssText="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;";const t2=document.createElement("h2");t2.style.cssText="color:#f1f5f9;font-size:18px;font-weight:700;margin:0;";t2.textContent="Un-Check Out Item?";const xb=document.createElement("button");xb.style.cssText="background:none;border:none;color:#475569;font-size:24px;cursor:pointer;";xb.textContent="✕";xb.onclick=function(){setState({modal:null});};tr.appendChild(t2);tr.appendChild(xb);inner2.appendChild(tr);
+    const ic=document.createElement("div");ic.style.cssText="background:#0f172a;border:1px solid #1e293b;border-radius:12px;padding:16px;margin-bottom:20px;";ic.innerHTML="<div style='color:#f1f5f9;font-weight:700;font-size:15px;margin-bottom:4px'>"+item.name+"</div><div style='color:#64748b;font-size:12px;font-family:monospace;margin-bottom:4px'>"+item.barcode+"</div><div style='color:#64748b;font-size:12px'>Used by: "+(item.usedBy||"—")+"</div>";inner2.appendChild(ic);
+    const il=S.log.filter(l=>l.barcode===item.barcode);const ce=il.find(l=>l.action==="CHECK_OUT");let prevLoc="Unclaimed Inventory";if(ce&&ce.from){const fv=ce.from.trim().toLowerCase();const mo=S.owners.find(o=>o.name.trim().toLowerCase()===fv||o.id.trim().toLowerCase()===fv);prevLoc=mo?mo.name:ce.from;}
+    const qp=document.createElement("p");qp.style.cssText="color:#94a3b8;font-size:14px;text-align:center;margin-bottom:20px;";qp.textContent="This will move the item back to: "+prevLoc;inner2.appendChild(qp);
+    const cfb=document.createElement("button");cfb.textContent="✓ Yes, Un-Check Out";cfb.style.cssText="width:100%;padding:16px;border-radius:12px;border:none;background:linear-gradient(135deg,#0ea5e9,#6366f1);color:#fff;font-weight:700;font-size:16px;cursor:pointer;display:block;font-family:inherit;margin-bottom:10px;";cfb.onclick=function(){setState({modal:null});submitUndoCheckout(item);};inner2.appendChild(cfb);
+    const cb=document.createElement("button");cb.textContent="Cancel";cb.style.cssText="width:100%;padding:14px;border-radius:12px;border:1px solid #334155;background:#1e293b;color:#94a3b8;font-weight:600;font-size:15px;cursor:pointer;display:block;font-family:inherit;";cb.onclick=function(){setState({modal:null});};inner2.appendChild(cb);div2.appendChild(inner2);return div2;
+  }
+  if(modal.type==="item_history"){
+    const item=modal.item;const itemLog=S.log.filter(l=>l.barcode===item.barcode);
+    const page=document.createElement("div");page.style.cssText="position:fixed;inset:0;background:#0a0f1c;z-index:1000;overflow-y:auto;-webkit-overflow-scrolling:touch;";const inner2=document.createElement("div");inner2.style.cssText="max-width:480px;margin:0 auto;padding:24px 20px;";
+    const hdr=document.createElement("div");hdr.style.cssText="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;padding-top:8px;";const ti=document.createElement("div");ti.innerHTML="<div style='color:#f1f5f9;font-size:18px;font-weight:700'>"+item.name+"</div><div style='color:#64748b;font-size:12px;font-family:monospace'>"+item.barcode+"</div>";const xb=document.createElement("button");xb.style.cssText="background:#1e293b;border:1px solid #334155;color:#94a3b8;font-size:18px;border-radius:8px;padding:8px 12px;cursor:pointer;font-family:inherit;";xb.textContent="✕";xb.onclick=function(){setState({modal:null});};hdr.appendChild(ti);hdr.appendChild(xb);inner2.appendChild(hdr);
+    const sc=document.createElement("div");sc.style.cssText="background:#111827;border:1px solid #1e293b;border-radius:12px;padding:14px 16px;margin-bottom:16px;";const on=S.owners.find(o=>o.id===item.ownerId)?.name||item.ownerId;sc.innerHTML="<div style='color:#94a3b8;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px'>Current Status</div><div style='display:flex;gap:16px;flex-wrap:wrap'><div><div style='color:#64748b;font-size:11px'>Location</div><div style='color:#f1f5f9;font-weight:600;font-size:13px'>"+on+"</div></div><div><div style='color:#64748b;font-size:11px'>Status</div><div style='color:#f1f5f9;font-weight:600;font-size:13px'>"+item.status+"</div></div><div><div style='color:#64748b;font-size:11px'>Expires</div><div style='color:#f1f5f9;font-weight:600;font-size:13px'>"+(item.expDate?item.expDate.substring(0,10):"—")+"</div></div></div>";inner2.appendChild(sc);
+    const ht=document.createElement("div");ht.style.cssText="color:#94a3b8;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;";ht.textContent="Activity History ("+itemLog.length+" events)";inner2.appendChild(ht);
+    if(itemLog.length===0){const em=document.createElement("div");em.style.cssText="color:#334155;font-size:13px;text-align:center;padding:24px 0;";em.textContent="No activity recorded yet";inner2.appendChild(em);}
+    else{const ac={CHECK_IN:"#22c55e",CHECK_OUT:"#f59e0b",TRANSFER:"#6366f1",ORDER_IN:"#0ea5e9",ORDER_OUT:"#a855f7"};const ai={CHECK_IN:"📥",CHECK_OUT:"📤",TRANSFER:"🔄",ORDER_IN:"📦",ORDER_OUT:"🚚"};
+    itemLog.forEach(function(entry){const row=document.createElement("div");row.style.cssText="background:#111827;border:1px solid #1e293b;border-radius:10px;padding:12px 14px;margin-bottom:8px;display:flex;gap:12px;align-items:flex-start;";const icon=document.createElement("span");icon.style.cssText="font-size:18px;margin-top:2px;";icon.textContent=ai[entry.action]||"📋";const info=document.createElement("div");info.style.cssText="flex:1;";const cl=ac[entry.action]||"#94a3b8";const al=(entry.action||"").replace(/_/g," ");let det="";if(entry.from&&entry.to)det=entry.from+" → "+entry.to;else if(entry.to)det="→ "+entry.to;else if(entry.from)det="from "+entry.from;info.innerHTML="<div style='display:flex;justify-content:space-between;align-items:center'><span style='color:"+cl+";font-weight:700;font-size:12px'>"+al+"</span><span style='color:#475569;font-size:10px'>"+formatDate(entry.ts)+"</span></div>"+(det?"<div style='color:#94a3b8;font-size:12px;margin-top:3px'>"+det+"</div>":"")+"<div style='color:#475569;font-size:11px;margin-top:2px'>by "+entry.user+"</div>";row.appendChild(icon);row.appendChild(info);inner2.appendChild(row);});}
+    page.appendChild(inner2);return page;
+  }
+  div.appendChild(inner);return div;
+}
+function renderToast(){const{toast}=S;const bg=toast.type==="err"?"#7f1d1d":toast.type==="warn"?"#78350f":"#14532d";return el("div",{class:"toast",style:{background:bg}},toast.msg);}
+if("serviceWorker"in navigator)navigator.serviceWorker.getRegistrations().then(regs=>regs.forEach(r=>r.unregister()));
 async function init(){
   render();
-  const params=new URLSearchParams(window.location.search);
-  const inviteCode=params.get("invite");
-  if(inviteCode)S.inviteCode=inviteCode;
-
-  await waitForFirebase();
-
-  if(inviteCode){
-    try{const inv=await window._getDoc("invites",inviteCode);if(inv&&!inv.usedBy)S.inviteData=inv;}catch(e){}
-  }
-
-  window._onAuth(async(user)=>{
-    if(!user){setState({screen:"login",user:null,profile:null,tenant:null});return;}
-    setState({user,screen:"loading"});
-    let profile=null;
-    try{profile=await window._getDoc("users",user.uid);}catch(e){console.error(e);}
+  const params=new URLSearchParams(window.location.search);const ic=params.get("invite");if(ic)S.inviteCode=ic;
+  await fsWaitForReady();
+  if(ic){try{const inv=await window.fsGetInvite(ic);if(inv&&!inv.usedBy)S.inviteData=inv;}catch(e){}}
+  window.onAuthChange(async(firebaseUser)=>{
+    if(!firebaseUser){setState({screen:"login",firebaseUser:null,profile:null,tenant:null});return;}
+    setState({firebaseUser,screen:"loading"});
+    let profile=null;try{profile=await window.fsGetUser(firebaseUser.uid);}catch(e){console.error(e);}
     if(!profile){setState({screen:"signup"});return;}
     setState({profile});
     if(!profile.tenantId){setState({screen:S.inviteCode?"join-org":"org-setup"});return;}
-    let tenant=null;
-    try{tenant=await window._getDoc("tenants",profile.tenantId);}catch(e){console.error(e);}
-    setState({tenant,screen:"app"});
-    loadData();
+    window._tenantId=profile.tenantId;
+    let tenant=null;try{tenant=await window.fsGetTenant(profile.tenantId);}catch(e){console.error(e);}
+    setState({tenant,screen:"app"});loadData();
   });
+  setInterval(()=>{if(S.screen==="app"&&!S.loading)loadData();},60000);
 }
-
-// Background sync every 60 seconds
-setInterval(()=>{if(S.screen==="app"&&!S.loading)loadData();},60000);
-
-if("serviceWorker" in navigator){
-  navigator.serviceWorker.getRegistrations().then(regs=>{regs.forEach(r=>r.unregister());});
-}
-
+let deferredPrompt=null;
+window.addEventListener("beforeinstallprompt",e=>{
+  e.preventDefault();deferredPrompt=e;
+  if(document.getElementById("install-banner"))return;
+  const banner=document.createElement("div");banner.id="install-banner";banner.style.cssText="position:fixed;bottom:0;left:0;right:0;background:#111827;border-top:1px solid #1e293b;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;z-index:9999;";
+  banner.innerHTML='<div><div style="color:#f1f5f9;font-weight:700;font-size:14px">Install Traxify</div><div style="color:#64748b;font-size:12px">Add to your home screen</div></div>';
+  const btns=document.createElement("div");btns.style.cssText="display:flex;gap:8px;";
+  const ib=document.createElement("button");ib.textContent="Install";ib.style.cssText="background:linear-gradient(135deg,#0ea5e9,#6366f1);color:#fff;border:none;border-radius:8px;padding:8px 16px;font-weight:700;font-size:13px;cursor:pointer;";ib.onclick=()=>{if(deferredPrompt){deferredPrompt.prompt();deferredPrompt.userChoice.then(()=>{deferredPrompt=null;banner.remove();});}};
+  const db=document.createElement("button");db.textContent="Later";db.style.cssText="background:transparent;color:#64748b;border:1px solid #334155;border-radius:8px;padding:8px 12px;font-size:13px;cursor:pointer;";db.onclick=()=>banner.remove();
+  btns.appendChild(ib);btns.appendChild(db);banner.appendChild(btns);document.body.appendChild(banner);
+});
 init();
 </script>
 </body>
