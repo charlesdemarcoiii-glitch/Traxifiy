@@ -86,6 +86,10 @@
     .auth-link:hover{text-decoration:underline}
     .choice-card{background:#0f172a;border:2px solid #1e293b;border-radius:14px;padding:20px;cursor:pointer;margin-bottom:12px;transition:border-color .15s}
     .choice-card:hover{border-color:#6366f1}
+    .drawer-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:899;opacity:0;transition:opacity .25s ease;pointer-events:none}
+    .drawer-overlay.open{opacity:1;pointer-events:all}
+    .settings-drawer{position:fixed;top:0;left:-110%;width:78%;max-width:320px;height:100vh;background:#111827;border-right:1px solid #1e293b;z-index:900;overflow-y:auto;-webkit-overflow-scrolling:touch;transition:left .25s ease;padding-bottom:48px}
+    .settings-drawer.open{left:0}
     @keyframes spin{to{transform:rotate(360deg)}}
     @media print{body *{visibility:hidden}#print-area,#print-area *{visibility:visible}#print-area{position:absolute;left:0;top:0;padding:20px;text-align:center}}
   </style>
@@ -98,7 +102,7 @@ async function fsWaitForReady(){let t=0;while(!window._firebaseReady&&t<100){awa
 function formatDate(ts){if(!ts)return"";try{const tz=Intl.DateTimeFormat().resolvedOptions().timeZone;return new Date(ts).toLocaleString("en-US",{timeZone:tz,month:"short",day:"numeric",year:"numeric",hour:"numeric",minute:"2-digit",hour12:true});}catch(e){return ts;}}
 const S={
   screen:"loading",firebaseUser:null,profile:null,tenant:null,inviteCode:null,inviteData:null,
-  showAccountMenu:false,tab:"dashboard",loading:false,toast:null,toastTimer:null,
+  showAccountMenu:false,showSettings:false,tab:"dashboard",loading:false,toast:null,toastTimer:null,
   scanning:false,scanMode:null,scanHint:"",inventorySearch:"",modal:null,selectedOwner:null,
   showScanPrompt:false,owners:[],items:[],orders:[],log:[],users:[],
   settings:{itemNames:[],descriptions:[]},
@@ -295,6 +299,7 @@ function render(){
   if(S.screen==="create-org"){app.appendChild(renderCreateOrg());if(S.toast)app.appendChild(renderToast());return;}
   if(S.screen==="join-org"){app.appendChild(renderJoinOrg());if(S.toast)app.appendChild(renderToast());return;}
   app.appendChild(renderApp());
+  if(S.showSettings)app.appendChild(renderSettingsDrawer());
   if(S.scanning){app.appendChild(renderScanner());setTimeout(startScanner,100);}
   if(S.showScanPrompt)app.appendChild(renderScanPrompt());
   if(S.showMultiDetails)app.appendChild(renderMultiDetails());
@@ -491,7 +496,10 @@ function renderApp(){
     setTimeout(()=>{document.addEventListener("click",function closeMenu(e){if(!acctBtn.contains(e.target)&&!menu.contains(e.target)){setState({showAccountMenu:false});document.removeEventListener("click",closeMenu);}});},0);
   }
   const syncBtn=el("button",{style:{padding:"8px 10px",borderRadius:"8px",background:"#1e293b",border:"1px solid #334155",color:"#94a3b8",fontSize:"14px"}},"⟳");
-  syncBtn.onclick=loadData;hRight.appendChild(syncBtn);
+  syncBtn.onclick=loadData;
+  const gearBtn=el("button",{style:{padding:"8px 10px",borderRadius:"8px",background:"#1e293b",border:"1px solid #334155",color:"#94a3b8",fontSize:"16px"}},"⚙️");
+  gearBtn.onclick=()=>setState({showSettings:true,showAccountMenu:false});
+  hRight.appendChild(syncBtn);hRight.appendChild(gearBtn);
   header.appendChild(logo);header.appendChild(hRight);wrap.appendChild(header);
   if(activeOrder){
     const banner=el("div",{style:{background:"#1e1b4b",borderBottom:"1px solid #4338ca",padding:"10px 16px",display:"flex",alignItems:"center",justifyContent:"space-between"}});
@@ -509,7 +517,7 @@ function renderApp(){
   if(admin){const btn=el("button",{class:"action-btn",style:{background:"#a855f718",border:"1px solid #a855f733",color:"#c084fc"}});btn.innerHTML='<span style="font-size:20px">🗃</span><span>Order</span>';btn.onclick=()=>setState({orderItems:[],showOrderItemScan:true,showOrderQRScan:false,showOrderSummary:false,pendingOrderQR:null,scanning:true,scanHint:"Scan items to add to order"});actions.appendChild(btn);}
   wrap.appendChild(actions);
   const tabs=el("div",{style:{display:"flex",borderBottom:"1px solid #1e293b",background:"#111827"}});
-  [["dashboard","Dashboard"],["inventory","Inventory"],["used","Used"],["orders","Orders"],["log","Log"],["settings","Settings"]].forEach(([id,label])=>{
+  [["dashboard","Dashboard"],["inventory","Inventory"],["used","Used"],["orders","Orders"],["log","Log"]].forEach(([id,label])=>{
     const btn=el("button",{class:"tab-btn",style:{color:tab===id?"#38bdf8":"#475569",fontWeight:tab===id?"700":"500",borderBottom:tab===id?"2px solid #38bdf8":"2px solid transparent",fontSize:"12px"}},label);
     btn.onclick=()=>setState({tab:id});tabs.appendChild(btn);
   });
@@ -607,8 +615,40 @@ function renderApp(){
       content.appendChild(card);
     });
   }
-  if(tab==="settings"){content.appendChild(renderSettings());}
   wrap.appendChild(content);return wrap;
+}
+
+function renderSettingsDrawer(){
+  // Overlay
+  const overlay=el("div",{class:"drawer-overlay"});
+  overlay.onclick=()=>setState({showSettings:false});
+
+  // Drawer
+  const drawer=el("div",{class:"settings-drawer"});
+
+  // Drawer header
+  const dHeader=el("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"16px 16px 12px",borderBottom:"1px solid #1e293b",position:"sticky",top:"0",background:"#111827",zIndex:"1"}});
+  const dTitle=el("div",{style:{display:"flex",alignItems:"center",gap:"8px"}});
+  dTitle.innerHTML='<span style="font-size:18px">⚙️</span><span style="font-weight:700;font-size:16px;color:#f1f5f9">Settings</span>';
+  const closeBtn=el("button",{style:{background:"none",border:"none",color:"#475569",fontSize:"22px",cursor:"pointer",lineHeight:"1",padding:"4px"}},"✕");
+  closeBtn.onclick=()=>setState({showSettings:false});
+  dHeader.appendChild(dTitle);dHeader.appendChild(closeBtn);
+  drawer.appendChild(dHeader);
+
+  // Settings content (same as before, just in the drawer)
+  const content=el("div",{style:{padding:"16px"}});
+  content.appendChild(renderSettings());
+  drawer.appendChild(content);
+
+  // Animate in after paint
+  const wrap=el("div");
+  wrap.appendChild(overlay);
+  wrap.appendChild(drawer);
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{
+    overlay.classList.add("open");
+    drawer.classList.add("open");
+  }));
+  return wrap;
 }
 
 function renderSettings(){
