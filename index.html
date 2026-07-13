@@ -71,7 +71,8 @@
     .btn-purple{background:linear-gradient(135deg,#6366f1,#4f46e5)}
     .btn-orange{background:#f59e0b}.btn-dark{background:#1e293b}.btn-red{background:#dc2626}
     .label{color:#94a3b8;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:6px}
-    .toast{position:fixed;bottom:32px;left:50%;transform:translateX(-50%);padding:13px 24px;border-radius:12px;font-weight:600;font-size:14px;z-index:9999;max-width:88vw;text-align:center;box-shadow:0 4px 24px rgba(0,0,0,.5);white-space:nowrap}
+    .toast{position:fixed;bottom:76px;left:50%;transform:translateX(-50%);padding:13px 24px;border-radius:12px;font-weight:600;font-size:14px;z-index:9999;max-width:88vw;text-align:center;box-shadow:0 4px 24px rgba(0,0,0,.5);white-space:nowrap;animation:toastIn .2s ease}
+    @keyframes toastIn{from{opacity:0;transform:translateX(-50%) translateY(8px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
     .overlay{position:fixed;inset:0;background:rgba(0,0,0,.85);display:flex;align-items:flex-end;justify-content:center;z-index:500;-webkit-overflow-scrolling:touch}
     .overlay-inner{width:100%;max-width:480px;background:#111827;border-radius:20px 20px 0 0;padding:24px 20px 48px;border:1px solid #1e293b;max-height:85vh;overflow-y:auto;-webkit-overflow-scrolling:touch;position:relative;z-index:501}
     .overlay-inner button{position:relative;z-index:502;-webkit-tap-highlight-color:rgba(0,0,0,0);touch-action:manipulation}
@@ -86,6 +87,14 @@
     .auth-link:hover{text-decoration:underline}
     .choice-card{background:#0f172a;border:2px solid #1e293b;border-radius:14px;padding:20px;cursor:pointer;margin-bottom:12px;transition:border-color .15s}
     .choice-card:hover{border-color:#6366f1}
+    .fade-in{animation:fadeIn .18s ease}
+    @keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+    .confirm-dialog{position:fixed;inset:0;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;z-index:1100;padding:20px}
+    .confirm-box{background:#111827;border:1px solid #334155;border-radius:16px;padding:24px;width:100%;max-width:320px;text-align:center}
+    .empty-state{text-align:center;padding:48px 20px;color:#334155}
+    .empty-state .empty-icon{font-size:40px;margin-bottom:12px}
+    .empty-state .empty-title{color:#475569;font-size:15px;font-weight:600;margin-bottom:6px}
+    .empty-state .empty-sub{color:#334155;font-size:13px;line-height:1.5}
     .drawer-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:899;opacity:0;transition:opacity .25s ease;pointer-events:none}
     .drawer-overlay.open{opacity:1;pointer-events:all}
     .settings-drawer{position:fixed;top:0;left:-110%;width:78%;max-width:320px;height:100vh;background:#111827;border-right:1px solid #1e293b;z-index:900;overflow-y:auto;-webkit-overflow-scrolling:touch;transition:left .25s ease;padding-bottom:48px}
@@ -100,6 +109,30 @@
 <script>
 async function fsWaitForReady(){let t=0;while(!window._firebaseReady&&t<100){await new Promise(r=>setTimeout(r,100));t++;}}
 function formatDate(ts){if(!ts)return"";try{const tz=Intl.DateTimeFormat().resolvedOptions().timeZone;return new Date(ts).toLocaleString("en-US",{timeZone:tz,month:"short",day:"numeric",year:"numeric",hour:"numeric",minute:"2-digit",hour12:true});}catch(e){return ts;}}
+
+// Human-readable action labels
+const ACTION_LABELS={CHECK_IN:"Check In",CHECK_OUT:"Check Out",TRANSFER:"Transfer",ORDER_IN:"Order Received",ORDER_OUT:"Order Sent",UNDO_CHECKOUT:"Returned"};
+const ACTION_ICONS={CHECK_IN:"📥",CHECK_OUT:"📤",TRANSFER:"🔄",ORDER_IN:"📦",ORDER_OUT:"🚚",UNDO_CHECKOUT:"↩️"};
+function actionLabel(a){return ACTION_LABELS[a]||(a||"").replace(/_/g," ");}
+function actionIcon(a){return ACTION_ICONS[a]||"📋";}
+
+// Haptic feedback
+function haptic(ms=40){try{if(navigator.vibrate)navigator.vibrate(ms);}catch(e){}}
+
+// Custom confirm dialog — returns a Promise<bool>
+function showConfirm(title,msg,confirmText="Delete",danger=true){
+  return new Promise(resolve=>{
+    const overlay=document.createElement("div");overlay.className="confirm-dialog";
+    const box=document.createElement("div");box.className="confirm-box";
+    box.innerHTML='<div style="font-size:28px;margin-bottom:12px">'+(danger?"⚠️":"❓")+'</div><div style="color:#f1f5f9;font-weight:700;font-size:16px;margin-bottom:8px">'+title+'</div><div style="color:#64748b;font-size:13px;margin-bottom:24px;line-height:1.5">'+msg+'</div>';
+    const btnRow=document.createElement("div");btnRow.style.cssText="display:flex;gap:10px;";
+    const cancelBtn=document.createElement("button");cancelBtn.style.cssText="flex:1;padding:12px;border-radius:9px;border:1px solid #334155;background:#1e293b;color:#94a3b8;font-weight:600;font-size:14px;cursor:pointer;font-family:inherit;";cancelBtn.textContent="Cancel";
+    cancelBtn.onclick=()=>{overlay.remove();resolve(false);};
+    const confirmBtn=document.createElement("button");confirmBtn.style.cssText="flex:1;padding:12px;border-radius:9px;border:none;background:"+(danger?"#dc2626":"#6366f1")+";color:#fff;font-weight:700;font-size:14px;cursor:pointer;font-family:inherit;";confirmBtn.textContent=confirmText;
+    confirmBtn.onclick=()=>{overlay.remove();resolve(true);};
+    btnRow.appendChild(cancelBtn);btnRow.appendChild(confirmBtn);box.appendChild(btnRow);overlay.appendChild(box);document.body.appendChild(overlay);
+  });
+}
 const S={
   screen:"loading",firebaseUser:null,profile:null,tenant:null,inviteCode:null,inviteData:null,
   showAccountMenu:false,showSettings:false,tab:"dashboard",loading:false,toast:null,toastTimer:null,
@@ -159,10 +192,10 @@ async function submitCheckin(barcode,name,type,expDate,ownerId){
   addItem(newItem);
   addLog({ts:now,action:"CHECK_IN",barcode,itemName:name,from:orderRef,to:ownerName,user:getProfile().displayName});
 }
-async function submitMultiCheckin(){
+async function submitMultiCheckin(targetOwner){
   const{multiDetails,multiCodes,owners}=S;
   setState({loading:true,showMultiConfirm:false});
-  const pool=owners[0];
+  const pool=targetOwner||owners[0];
   const now=new Date().toISOString();
   try{
     for(const barcode of multiCodes){
@@ -249,7 +282,7 @@ function handleScan(barcode){
       if(item.status==="used"){showToast("Item already used","warn");setState({scanning:true});return;}
       if(item.status==="transit"){showToast("Item already in transit","warn");setState({scanning:true});return;}
       if(S.orderItems.includes(barcode)){showToast("Already added to order","warn");setState({scanning:true});return;}
-      const newItems=[...S.orderItems,barcode];setState({orderItems:newItems,scanning:true});showToast("📦 "+newItems.length+" item"+(newItems.length>1?"s":"")+" added to order");
+      haptic();const newItems=[...S.orderItems,barcode];setState({orderItems:newItems,scanning:true});showToast("📦 "+newItems.length+" item"+(newItems.length>1?"s":"")+" added to order");
     }else{showToast("Item not found — must be checked in first","err");setState({scanning:true});}
     return;
   }
@@ -257,18 +290,18 @@ function handleScan(barcode){
     if(S.orders.find(o=>o.id===barcode)){showToast("This QR is already an order","err");setState({scanning:true});return;}
     const existingItem=items.find(i=>i.barcode===barcode);
     if(existingItem&&existingItem.status==="active"&&!S.orderItems.includes(barcode)){showToast("This QR belongs to an active item","warn");setState({scanning:true});return;}
-    setState({scanning:false,showOrderQRScan:false,pendingOrderQR:barcode,showOrderSummary:true});return;
+    haptic();setState({scanning:false,showOrderQRScan:false,pendingOrderQR:barcode,showOrderSummary:true});return;
   }
   if(showMultiScan){
     if(items.find(i=>i.barcode===barcode)){showToast("Already tracked: "+barcode,"warn");setState({scanning:true});return;}
     if(multiCodes.includes(barcode)){showToast("Already scanned this code","warn");setState({scanning:true});return;}
-    const newCodes=[...multiCodes,barcode];setState({multiCodes:newCodes,scanning:true});showToast("📦 Code "+newCodes.length+" scanned");return;
+    haptic();const newCodes=[...multiCodes,barcode];setState({multiCodes:newCodes,scanning:true});showToast("📦 Code "+newCodes.length+" scanned");return;
   }
   setState({scanning:false});
   if(scanMode==="order"&&!activeOrder){const order=S.orders.find(o=>o.id===barcode);if(!order){showToast("Order not found","err");return;}setState({activeOrder:order,scanning:true,scanHint:"Scan items to add to order"});showToast("📦 Order: "+order.name+" — scan items");return;}
   if(scanMode==="order"&&activeOrder){if(items.find(i=>i.barcode===barcode)){showToast("Already tracked","warn");setState({scanning:true});return;}setState({modal:{type:"checkin",barcode,orderMode:true}});return;}
-  if(scanMode==="checkin"){if(items.find(i=>i.barcode===barcode)){showToast("Already tracked — item exists","warn");return;}setState({modal:{type:"checkin",barcode,orderMode:false}});return;}
-  if(scanMode==="checkout"){const item=items.find(i=>i.barcode===barcode);if(!item){showToast("Item not found","err");return;}if(item.status==="used"){showToast("Already checked out","warn");return;}if(!isAdmin()&&item.ownerId!==getProfile().ownerId){showToast("You can only check out items in your own inventory","err");return;}setState({modal:{type:"checkout",item}});return;}
+  if(scanMode==="checkin"){if(items.find(i=>i.barcode===barcode)){showToast("Already tracked — item exists","warn");return;}haptic();setState({modal:{type:"checkin",barcode,orderMode:false}});return;}
+  if(scanMode==="checkout"){const item=items.find(i=>i.barcode===barcode);if(!item){showToast("Item not found","err");return;}if(item.status==="used"){showToast("Already checked out","warn");return;}if(!isAdmin()&&item.ownerId!==getProfile().ownerId){showToast("You can only check out items in your own inventory","err");return;}haptic();setState({modal:{type:"checkout",item}});return;}
   if(scanMode==="transfer"){
     const order=S.orders.find(o=>o.id===barcode);
     if(order){if(order.status==="received"){showToast("Order already received","warn");return;}const barcodes=(order.items||"").split(",").filter(b=>b.trim());if(barcodes.length===0){showToast("Order has no items","warn");return;}setState({modal:{type:"receive_order",order,barcodes,toOwnerId:isAdmin()?"":getProfile().ownerId}});return;}
@@ -522,9 +555,17 @@ function renderApp(){
     btn.onclick=()=>setState({tab:id});tabs.appendChild(btn);
   });
   wrap.appendChild(tabs);
-  const content=el("div",{style:{padding:"16px",maxWidth:"480px",margin:"0 auto",paddingBottom:"32px"}});
+  const content=el("div",{style:{padding:"16px",maxWidth:"480px",margin:"0 auto",paddingBottom:"32px"},class:"fade-in"});
   if(loading)content.appendChild(el("p",{style:{textAlign:"center",color:"#475569",fontSize:"13px"}},"Loading…"));
   if(tab==="dashboard"){
+    // No locations warning for admins
+    if(admin&&owners.length===0&&!loading){
+      const setupCard=el("div",{style:{background:"linear-gradient(135deg,#0ea5e918,#6366f118)",border:"1px solid #6366f133",borderRadius:"14px",padding:"24px",marginBottom:"16px",textAlign:"center"}});
+      setupCard.innerHTML='<div style="font-size:36px;margin-bottom:12px">📍</div><div style="color:#f1f5f9;font-weight:700;font-size:16px;margin-bottom:6px">Set up your first location</div><div style="color:#64748b;font-size:13px;margin-bottom:16px;line-height:1.5">Add a location in Settings before checking in items — for example: Warehouse, Office, or a person\'s name.</div>';
+      const goBtn=el("button",{style:{background:"linear-gradient(135deg,#0ea5e9,#6366f1)",color:"#fff",border:"none",borderRadius:"9px",padding:"11px 24px",fontWeight:"700",fontSize:"14px",cursor:"pointer",fontFamily:"inherit"}},"⚙️ Open Settings");
+      goBtn.onclick=()=>setState({showSettings:true});
+      setupCard.appendChild(goBtn);content.appendChild(setupCard);
+    }
     const welcome=el("div",{class:"card",style:{background:"linear-gradient(135deg,#0ea5e918,#6366f118)",marginBottom:"12px"}});
     welcome.innerHTML='<p style="margin:0;color:#94a3b8;font-size:14px">Welcome, <span style="color:#f1f5f9;font-weight:700">'+(profile.displayName||profile.email)+'</span>'+(admin?'<span style="color:#818cf8;font-weight:600"> · Admin</span>':'')+'</p><p style="margin:4px 0 0;color:#475569;font-size:12px">'+(S.tenant?.name||"")+'</p>';
     content.appendChild(welcome);
@@ -558,9 +599,11 @@ function renderApp(){
       content.appendChild(filters);
     }
     const sw=document.createElement("div");sw.style.cssText="position:relative;margin-bottom:12px;";
-    const si=document.createElement("input");si.type="text";si.placeholder="🔍  Search by name or barcode…";si.style.cssText="width:100%;box-sizing:border-box;";si.value=S.inventorySearch||"";
-    let sd=null;si.oninput=function(){const val=this.value;clearTimeout(sd);sd=setTimeout(()=>setState({inventorySearch:val}),800);};
-    sw.appendChild(si);content.appendChild(sw);
+    const si=document.createElement("input");si.type="text";si.placeholder="🔍  Search by name or barcode…";si.style.cssText="width:100%;box-sizing:border-box;padding-right:36px;";si.value=S.inventorySearch||"";
+    let sd=null;si.oninput=function(){const val=this.value;clearTimeout(sd);sd=setTimeout(()=>setState({inventorySearch:val}),600);};
+    const clearBtn=document.createElement("button");clearBtn.textContent="✕";clearBtn.style.cssText="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;color:#475569;font-size:16px;cursor:pointer;padding:4px;display:"+(S.inventorySearch?"block":"none")+";";
+    clearBtn.onclick=()=>setState({inventorySearch:""});
+    sw.appendChild(si);sw.appendChild(clearBtn);content.appendChild(sw);
     const searchTerm=(S.inventorySearch||"").toLowerCase().trim();
     const baseItems=admin?(selectedOwner?activeItems.filter(i=>i.ownerId===selectedOwner.id):activeItems):visActiveItems;
     const displayItems=searchTerm?baseItems.filter(i=>i.name.toLowerCase().includes(searchTerm)||i.barcode.toLowerCase().includes(searchTerm)):baseItems;
@@ -577,7 +620,11 @@ function renderApp(){
     }
     const transitItems=items.filter(i=>i.status==="transit");
     if(admin&&transitItems.length>0){const tCard=document.createElement("div");tCard.style.cssText="background:#431407;border:1px solid #78350f;border-radius:10px;padding:14px;margin-bottom:12px;";tCard.innerHTML="<p style='color:#fcd34d;font-weight:700;font-size:13px;margin:0 0 8px'>🚚 In Transit ("+transitItems.length+")</p>"+transitItems.map(i=>"<p style='color:#fbbf24;font-size:12px;margin:2px 0'>• "+i.name+" — "+i.barcode+"</p>").join("");content.appendChild(tCard);}
-    if(displayItems.length===0)content.appendChild(el("p",{style:{color:"#334155",textAlign:"center",fontSize:"13px",marginTop:"30px"}},"No active items"));
+    if(displayItems.length===0){
+      const es=document.createElement("div");es.className="empty-state";
+      es.innerHTML='<div class="empty-icon">📦</div><div class="empty-title">'+(S.inventorySearch?"No items match your search":"No active items")+'</div><div class="empty-sub">'+(S.inventorySearch?'Try a different search term':'Check in your first item using the 📥 button above')+'</div>';
+      content.appendChild(es);
+    }
     displayItems.forEach(item=>{
       const isExp=item.expDate&&new Date(item.expDate)<new Date();const days=item.expDate?Math.ceil((new Date(item.expDate)-Date.now())/86400000):null;const soon=days!==null&&days>=0&&days<=120;
       const card=el("div",{style:{background:"#111827",borderRadius:"10px",padding:"12px 14px",marginBottom:"8px",border:"1px solid "+(isExp?"#7f1d1d":soon?"#78350f":"#1e293b")}});
@@ -588,7 +635,7 @@ function renderApp(){
   }
   if(tab==="used"){
     content.appendChild(el("p",{style:{color:"#475569",fontSize:"12px",fontWeight:"600",margin:"0 0 12px",textTransform:"uppercase",letterSpacing:".07em"}},admin?"All Used Items":"Your Used Items"));
-    if(visUsedItems.length===0)content.appendChild(el("p",{style:{color:"#334155",textAlign:"center",fontSize:"13px",marginTop:"30px"}},"No used items yet"));
+    if(visUsedItems.length===0){const es=document.createElement("div");es.className="empty-state";es.innerHTML='<div class="empty-icon">📤</div><div class="empty-title">No used items yet</div><div class="empty-sub">Items you check out will appear here</div>';content.appendChild(es);}
     visUsedItems.forEach(item=>{
       const card=el("div",{style:{background:"#111827",borderRadius:"10px",padding:"12px 14px",marginBottom:"8px",border:"1px solid #374151"}});
       card.innerHTML='<div style="display:flex;justify-content:space-between;align-items:flex-start"><div><div style="font-weight:700;color:#9ca3af;font-size:14px">'+item.name+'</div><div style="color:#64748b;font-size:11px;margin-top:2px;font-family:monospace">'+item.barcode+' · '+(item.type||"")+'</div></div><span class="badge" style="background:#374151;color:#9ca3af">USED</span></div><div style="display:flex;gap:12px;margin-top:6px">'+(item.expDate?'<span style="color:#64748b;font-size:11px">Exp: '+item.expDate+'</span>':"")+(admin?'<span style="color:#64748b;font-size:11px">Used by: '+(item.usedBy||"—")+'</span>':"")+'</div>';
@@ -597,21 +644,42 @@ function renderApp(){
     });
   }
   if(tab==="orders"){
-    if(orders.length===0)content.appendChild(el("p",{style:{color:"#334155",textAlign:"center",fontSize:"13px",marginTop:"20px"}},"No orders yet"));
-    orders.forEach(order=>{
-      const card=el("div",{class:"card"});const st=order.status||"open";const barcodes=(order.items||"").split(",").filter(b=>b.trim());
-      const statusColors={"transit":"#fbbf24","received":"#86efac","open":"#38bdf8"};const statusBgs={"transit":"#78350f","received":"#14532d","open":"#0f172a"};
-      card.innerHTML='<div style="display:flex;justify-content:space-between;align-items:flex-start"><div><div style="font-weight:700;color:#f1f5f9;font-size:14px">'+(order.name||order.id)+'</div><div style="color:#64748b;font-size:11px;font-family:monospace;margin-top:2px">'+order.id+'</div><div style="color:#64748b;font-size:11px;margin-top:2px">Items: '+barcodes.length+' · By: '+order.createdBy+'</div></div><span class="badge" style="background:'+(statusBgs[st]||"#1e293b")+';color:'+(statusColors[st]||"#64748b")+'">'+st.toUpperCase()+'</span></div><div style="color:#64748b;font-size:11px;margin-top:6px">'+(order.createdAt?formatDate(order.createdAt):"")+'</div>';
-      content.appendChild(card);
-    });
+    const pending=orders.filter(o=>o.status==="transit"||o.status==="open");
+    const received=orders.filter(o=>o.status==="received");
+    if(orders.length===0){const es=document.createElement("div");es.className="empty-state";es.innerHTML='<div class="empty-icon">🚚</div><div class="empty-title">No orders yet</div><div class="empty-sub">Use the 🗃 Order button above to create a shipment between locations</div>';content.appendChild(es);}
+    if(pending.length>0){
+      content.appendChild(el("p",{style:{color:"#475569",fontSize:"11px",fontWeight:"600",margin:"0 0 8px",textTransform:"uppercase",letterSpacing:".07em"}},"Pending ("+pending.length+") — Tap to Receive"));
+      pending.forEach(order=>{
+        const card=el("div",{class:"card",style:{cursor:"pointer",borderColor:"#78350f",background:"#431407"}});
+        const barcodes=(order.items||"").split(",").filter(b=>b.trim());
+        card.innerHTML='<div style="display:flex;justify-content:space-between;align-items:flex-start"><div><div style="font-weight:700;color:#f1f5f9;font-size:14px">'+(order.name||order.id)+'</div><div style="color:#64748b;font-size:11px;font-family:monospace;margin-top:2px">'+order.id+'</div><div style="color:#64748b;font-size:11px;margin-top:2px">'+barcodes.length+' items · by '+order.createdBy+'</div></div><span class="badge" style="background:#78350f;color:#fbbf24">IN TRANSIT</span></div><div style="color:#fbbf24;font-size:12px;font-weight:600;margin-top:10px">👆 Tap to receive this order</div>';
+        card.onclick=()=>{haptic();const barcodes=(order.items||"").split(",").filter(b=>b.trim());setState({modal:{type:"receive_order",order,barcodes,toOwnerId:isAdmin()?"":getProfile().ownerId}});};
+        content.appendChild(card);
+      });
+    }
+    if(received.length>0){
+      content.appendChild(el("p",{style:{color:"#475569",fontSize:"11px",fontWeight:"600",margin:"16px 0 8px",textTransform:"uppercase",letterSpacing:".07em"}},"Received ("+received.length+")"));
+      received.forEach(order=>{
+        const card=el("div",{class:"card"});
+        const barcodes=(order.items||"").split(",").filter(b=>b.trim());
+        card.innerHTML='<div style="display:flex;justify-content:space-between;align-items:flex-start"><div><div style="font-weight:700;color:#9ca3af;font-size:14px">'+(order.name||order.id)+'</div><div style="color:#64748b;font-size:11px;margin-top:2px">'+barcodes.length+' items · by '+order.createdBy+'</div></div><span class="badge" style="background:#14532d;color:#86efac">RECEIVED</span></div><div style="color:#475569;font-size:11px;margin-top:6px">'+(order.createdAt?formatDate(order.createdAt):"")+'</div>';
+        content.appendChild(card);
+      });
+    }
   }
   if(tab==="log"){
     const displayLog=admin?S.log:S.log.filter(e=>e.user===profile.displayName||e.from===owners.find(o=>o.id===profile.ownerId)?.name||e.to===owners.find(o=>o.id===profile.ownerId)?.name);
-    if(displayLog.length===0)content.appendChild(el("p",{style:{color:"#334155",textAlign:"center",fontSize:"13px",marginTop:"30px"}},"No activity yet"));
-    const colors={CHECK_IN:"#22c55e",CHECK_OUT:"#f59e0b",TRANSFER:"#6366f1"};const icons={CHECK_IN:"📥",CHECK_OUT:"📤",TRANSFER:"🔄"};
+    if(displayLog.length===0){const es=document.createElement("div");es.className="empty-state";es.innerHTML='<div class="empty-icon">📋</div><div class="empty-title">No activity yet</div><div class="empty-sub">Every check-in, checkout, and transfer will appear here</div>';content.appendChild(es);}
+    const colors={CHECK_IN:"#22c55e",CHECK_OUT:"#f59e0b",TRANSFER:"#6366f1",ORDER_IN:"#0ea5e9",ORDER_OUT:"#a855f7",UNDO_CHECKOUT:"#94a3b8"};
     displayLog.forEach(entry=>{
       const card=el("div",{style:{background:"#111827",borderRadius:"10px",padding:"11px 14px",marginBottom:"7px",border:"1px solid #1e293b",display:"flex",gap:"12px"}});
-      card.innerHTML='<span style="font-size:20px">'+(icons[entry.action]||"📋")+'</span><div style="flex:1"><div style="display:flex;justify-content:space-between"><span style="color:'+(colors[entry.action]||"#94a3b8")+';font-weight:700;font-size:12px">'+(entry.action?.replace(/_/g," "))+'</span><span style="color:#334155;font-size:11px">'+(entry.ts?formatDate(entry.ts):"")+'</span></div><div style="color:#f1f5f9;font-size:13px;margin-top:2px">'+(entry.itemName||"")+'</div><div style="display:flex;gap:10px;margin-top:3px"><span style="color:#64748b;font-size:11px;font-family:monospace">'+(entry.barcode||"")+'</span><span style="color:#475569;font-size:11px">by '+(entry.user||"")+'</span></div>'+(entry.action==="TRANSFER"?'<div style="color:#818cf8;font-size:11px;margin-top:2px">'+entry.from+' → '+entry.to+'</div>':"")+(entry.action==="CHECK_OUT"?'<div style="color:#fb923c;font-size:11px;margin-top:2px">from '+entry.from+' → Used</div>':"")+(entry.action==="CHECK_IN"&&entry.from?.startsWith("ORD-")?'<div style="color:#818cf8;font-size:11px;margin-top:2px">Order: '+entry.from+'</div>':"")+'</div>';
+      const color=colors[entry.action]||"#94a3b8";
+      let detail="";
+      if(entry.action==="TRANSFER"&&entry.from&&entry.to)detail='<div style="color:#818cf8;font-size:11px;margin-top:2px">'+entry.from+' → '+entry.to+'</div>';
+      else if(entry.action==="CHECK_OUT"&&entry.from)detail='<div style="color:#fb923c;font-size:11px;margin-top:2px">from '+entry.from+'</div>';
+      else if((entry.action==="ORDER_IN"||entry.action==="ORDER_OUT")&&entry.to)detail='<div style="color:#818cf8;font-size:11px;margin-top:2px">→ '+entry.to+'</div>';
+      else if(entry.action==="CHECK_IN"&&entry.to)detail='<div style="color:#22c55e;font-size:11px;margin-top:2px">→ '+entry.to+'</div>';
+      card.innerHTML='<span style="font-size:20px;margin-top:2px">'+actionIcon(entry.action)+'</span><div style="flex:1;min-width:0"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><span style="color:'+color+';font-weight:700;font-size:12px;flex-shrink:0">'+actionLabel(entry.action)+'</span><span style="color:#334155;font-size:11px;white-space:nowrap">'+(entry.ts?formatDate(entry.ts):"")+'</span></div><div style="color:#f1f5f9;font-size:13px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+(entry.itemName||entry.barcode||"")+'</div>'+detail+'<div style="color:#475569;font-size:11px;margin-top:2px">by '+(entry.user||"")+'</div></div>';
       content.appendChild(card);
     });
   }
@@ -816,7 +884,8 @@ function renderSettings(){
         // Delete button
         const delBtn=el("button",{style:{padding:"5px 10px",borderRadius:"7px",border:"1px solid #7f1d1d",background:"transparent",color:"#f87171",fontSize:"12px",fontWeight:"600",cursor:"pointer",fontFamily:"inherit"}},"🗑 Delete");
         delBtn.onclick=async()=>{
-          if(!confirm("Delete location \""+o.name+"\"? Items assigned here will still exist but their location will show as the deleted ID."))return;
+          const confirmed=await showConfirm("Delete Location","Delete \""+o.name+"\"? Items assigned here won't be deleted but will lose their location name.","Delete",true);
+          if(!confirmed)return;
           delBtn.disabled=true;delBtn.textContent="Deleting…";
           try{
             await window.fsDelete("owners",o.id);
@@ -862,6 +931,10 @@ function renderSettings(){
   soBtn.style.marginTop="0";
   soBtn.onclick=()=>{stopScanner();window.firebaseSignOut();setState({screen:"login",firebaseUser:null,profile:null,tenant:null,owners:[],items:[],log:[],orders:[],users:[],showAccountMenu:false,tab:"dashboard"});};
   wrap.appendChild(soBtn);
+
+  const versionDiv=el("div",{style:{textAlign:"center",color:"#334155",fontSize:"11px",marginTop:"24px",paddingTop:"16px",borderTop:"1px solid #1e293b"}});
+  versionDiv.textContent="Traxify v1.0 · Built for teams";
+  wrap.appendChild(versionDiv);
 
   return wrap;
 }
@@ -929,9 +1002,25 @@ function renderMultiConfirm(){
   cl.innerHTML='<p style="color:#94a3b8;font-size:11px;font-weight:600;margin:0 0 8px;text-transform:uppercase;letter-spacing:.05em">Scanned Codes</p>';
   multiCodes.forEach((code,i)=>{const row=el("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"4px 0",borderBottom:i<multiCodes.length-1?"1px solid #1e293b":"none"}});row.innerHTML='<span style="color:#94a3b8;font-size:12px;font-family:monospace">'+code+'</span>';const rb=el("button",{style:{background:"none",border:"none",color:"#475569",fontSize:"14px",cursor:"pointer",padding:"2px 6px"}},"✕");rb.onclick=()=>{setState({multiCodes:S.multiCodes.filter(c=>c!==code)});};row.appendChild(rb);cl.appendChild(row);});
   inner.appendChild(cl);
-  const pool=S.owners[0];
-  inner.appendChild(el("p",{style:{color:"#475569",fontSize:"12px",margin:"0 0 16px",textAlign:"center"}},"All items → 🏪 "+(pool?.name||"General Pool")));
-  const cfb=el("button",{class:"btn btn-green",style:{marginBottom:"10px"}},"✅ Confirm — Check In "+multiCodes.length+" Item"+(multiCodes.length!==1?"s":""));cfb.onclick=submitMultiCheckin;inner.appendChild(cfb);
+  const pool=S.owners.length>0?S.owners[0]:null;
+  if(!pool){
+    const noLoc=el("div",{class:"overlay"});const ni=el("div",{class:"overlay-inner"});
+    ni.innerHTML='<div style="text-align:center;padding:20px 0"><div style="font-size:32px;margin-bottom:12px">📍</div><div style="color:#f1f5f9;font-weight:700;font-size:16px;margin-bottom:8px">No locations set up</div><div style="color:#64748b;font-size:13px;margin-bottom:20px">Add a location in Settings before checking in items.</div></div>';
+    const goBtn=el("button",{class:"btn btn-primary"},"⚙️ Open Settings");goBtn.onclick=()=>setState({showMultiConfirm:false,showSettings:true});ni.appendChild(goBtn);
+    const cancelBtn=el("button",{class:"btn btn-dark",style:{marginTop:"10px"}},"Cancel");cancelBtn.onclick=()=>setState({showMultiConfirm:false,multiMode:false,multiCodes:[],multiDetails:null});ni.appendChild(cancelBtn);
+    noLoc.appendChild(ni);return noLoc;
+  }
+  let selectedCheckinOwner=pool.id;
+  inner.appendChild(el("p",{style:{color:"#475569",fontSize:"12px",margin:"0 0 16px",textAlign:"center"}},"Checking in to:"));
+  if(S.owners.length>1){
+    const locSel=el("select",{id:"multi-loc-sel",style:{marginBottom:"16px",textAlign:"center"}});
+    S.owners.forEach(o=>locSel.appendChild(el("option",{value:o.id},o.name)));
+    locSel.onchange=function(){selectedCheckinOwner=this.value;};
+    inner.appendChild(locSel);
+  }else{
+    inner.appendChild(el("div",{style:{background:"#0f172a",borderRadius:"9px",padding:"10px 14px",textAlign:"center",color:"#38bdf8",fontWeight:"600",marginBottom:"16px"}},"📍 "+pool.name));
+  }
+  const cfb=el("button",{class:"btn btn-green",style:{marginBottom:"10px"}},"✅ Confirm — Check In "+multiCodes.length+" Item"+(multiCodes.length!==1?"s":""));cfb.onclick=()=>{const targetId=document.getElementById("multi-loc-sel")?.value||selectedCheckinOwner;const targetOwner=S.owners.find(o=>o.id===targetId)||pool;submitMultiCheckin(targetOwner);};inner.appendChild(cfb);
   const bb=el("button",{class:"btn btn-dark",style:{marginBottom:"10px"}},"← Scan More Codes");bb.onclick=()=>setState({showMultiConfirm:false,showMultiScan:true,scanning:true,scanHint:"Scan QR codes — tap Done when finished"});inner.appendChild(bb);
   const xb=el("button",{class:"btn",style:{background:"transparent",border:"1px solid #334155",color:"#64748b"}},"Cancel");xb.onclick=()=>setState({showMultiConfirm:false,multiMode:false,multiCodes:[],multiDetails:null,scanMode:null});inner.appendChild(xb);
   div.appendChild(inner);return div;
@@ -1055,6 +1144,19 @@ if("serviceWorker"in navigator)navigator.serviceWorker.getRegistrations().then(r
 async function init(){
   render();
   const params=new URLSearchParams(window.location.search);const ic=params.get("invite");if(ic)S.inviteCode=ic;
+  // Escape key closes modals and drawer
+  document.addEventListener("keydown",e=>{
+    if(e.key!=="Escape")return;
+    if(S.modal)setState({modal:null});
+    else if(S.showSettings)setState({showSettings:false});
+    else if(S.showScanPrompt)setState({showScanPrompt:false});
+  });
+
+  // Refresh data when user comes back to the tab
+  document.addEventListener("visibilitychange",()=>{
+    if(!document.hidden&&S.screen==="app"&&!S.loading&&!S.scanning)loadData();
+  });
+
   await fsWaitForReady();
   if(ic){try{const inv=await window.fsGetInvite(ic);if(inv&&!inv.usedBy)S.inviteData=inv;}catch(e){}}
   window.onAuthChange(async(firebaseUser)=>{
