@@ -95,8 +95,8 @@
     .empty-state .empty-icon{font-size:40px;margin-bottom:12px}
     .empty-state .empty-title{color:#475569;font-size:15px;font-weight:600;margin-bottom:6px}
     .empty-state .empty-sub{color:#334155;font-size:13px;line-height:1.5}
-    .drawer-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:899;opacity:0;transition:opacity .25s ease;pointer-events:none}
-    .drawer-overlay.open{opacity:1;pointer-events:all}
+    .drawer-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:899;opacity:0;transition:opacity .25s ease;pointer-events:none;touch-action:none}
+    .drawer-overlay.open{opacity:1;pointer-events:all;touch-action:none}
     .settings-drawer{position:fixed;top:0;left:-110%;width:78%;max-width:320px;height:100vh;background:#111827;border-right:1px solid #1e293b;z-index:900;overflow-y:auto;-webkit-overflow-scrolling:touch;transition:left .25s ease;padding-bottom:48px}
     .settings-drawer.open{left:0}
     @keyframes spin{to{transform:rotate(360deg)}}
@@ -331,6 +331,8 @@ function render(){
   if(S.screen==="org-setup"){app.appendChild(renderOrgSetup());if(S.toast)app.appendChild(renderToast());return;}
   if(S.screen==="create-org"){app.appendChild(renderCreateOrg());if(S.toast)app.appendChild(renderToast());return;}
   if(S.screen==="join-org"){app.appendChild(renderJoinOrg());if(S.toast)app.appendChild(renderToast());return;}
+  // Lock body scroll when settings drawer is open
+  document.body.style.overflow=S.showSettings?"hidden":"";
   app.appendChild(renderApp());
   if(S.showSettings)app.appendChild(renderSettingsDrawer());
   if(S.scanning){app.appendChild(renderScanner());setTimeout(startScanner,100);}
