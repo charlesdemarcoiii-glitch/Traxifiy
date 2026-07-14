@@ -139,7 +139,20 @@ function showConfirm(title,msg,confirmText="Delete",danger=true){
     btnRow.appendChild(cancelBtn);btnRow.appendChild(confirmBtn);box.appendChild(btnRow);overlay.appendChild(box);document.body.appendChild(overlay);
   });
 }
-const S={
+
+// Share invite link via native share sheet (iOS/Android) or email fallback
+function shareInvite(url){
+  const orgName=S.tenant?.name||"our team";
+  const text="You've been invited to join "+orgName+" on Traxify — inventory tracking for teams.\n\nTap the link to create your account:";
+  if(navigator.share){
+    navigator.share({title:"Join "+orgName+" on Traxify",text,url}).catch(()=>{});
+  }else{
+    // Fallback: open mailto
+    const subject=encodeURIComponent("You've been invited to join "+orgName+" on Traxify");
+    const body=encodeURIComponent(text+"\n\n"+url);
+    window.open("mailto:?subject="+subject+"&body="+body);
+  }
+}
   screen:"loading",firebaseUser:null,profile:null,tenant:null,inviteCode:null,inviteData:null,
   showAccountMenu:false,showSettings:false,tab:"dashboard",loading:false,toast:null,toastTimer:null,
   scanning:false,scanMode:null,scanHint:"",inventorySearch:"",modal:null,selectedOwner:null,
@@ -798,11 +811,13 @@ function renderSettings(){
       const expBadge=el("span",{style:{background:daysLeft<=2?"#7f1d1d22":"#78350f22",color:daysLeft<=2?"#f87171":"#fbbf24",border:"1px solid "+(daysLeft<=2?"#7f1d1d44":"#78350f44"),borderRadius:"6px",fontSize:"10px",fontWeight:"700",padding:"2px 8px",whiteSpace:"nowrap"}},(daysLeft<=2?"⚠ ":"")+daysLeft+"d left");
       iHdr.appendChild(iInfo);iHdr.appendChild(expBadge);ic.appendChild(iHdr);
       const iActs=el("div",{style:{display:"flex",gap:"8px"}});
-      const cb2=el("button",{style:{flex:"1",padding:"7px 10px",borderRadius:"7px",border:"1px solid #334155",background:"#1e293b",color:"#f1f5f9",fontSize:"12px",fontWeight:"600",cursor:"pointer",fontFamily:"inherit"}},"📋 Copy Link");
-      cb2.onclick=()=>{navigator.clipboard.writeText(inviteURL).then(()=>{cb2.textContent="✅ Copied!";setTimeout(()=>{cb2.textContent="📋 Copy Link";},2500);}).catch(()=>{prompt("Copy this link:",inviteURL);});};
+      const cb2=el("button",{style:{flex:"1",padding:"7px 10px",borderRadius:"7px",border:"1px solid #334155",background:"#1e293b",color:"#f1f5f9",fontSize:"12px",fontWeight:"600",cursor:"pointer",fontFamily:"inherit"}},"📋 Copy");
+      cb2.onclick=()=>{navigator.clipboard.writeText(inviteURL).then(()=>{cb2.textContent="✅ Copied!";setTimeout(()=>{cb2.textContent="📋 Copy";},2500);}).catch(()=>{prompt("Copy this link:",inviteURL);});};
+      const shrBtn=el("button",{style:{flex:"1",padding:"7px 10px",borderRadius:"7px",border:"1px solid #0ea5e933",background:"#0ea5e918",color:"#38bdf8",fontSize:"12px",fontWeight:"600",cursor:"pointer",fontFamily:"inherit"}},"📤 Share");
+      shrBtn.onclick=()=>shareInvite(inviteURL);
       const rvkBtn=el("button",{style:{padding:"7px 12px",borderRadius:"7px",border:"1px solid #7f1d1d",background:"transparent",color:"#f87171",fontSize:"12px",fontWeight:"600",cursor:"pointer",fontFamily:"inherit"}},"Revoke");
       rvkBtn.onclick=async()=>{const ok=await showConfirm("Revoke Invite","This link will stop working immediately.","Revoke",true);if(!ok)return;rvkBtn.disabled=true;try{await window.fsDeleteInvite(invite.id);setState({invites:S.invites.filter(i=>i.id!==invite.id)});showToast("✅ Invite revoked");}catch(e){showToast("Failed: "+e.message,"err");rvkBtn.disabled=false;}};
-      iActs.appendChild(cb2);iActs.appendChild(rvkBtn);ic.appendChild(iActs);wrap.appendChild(ic);
+      iActs.appendChild(cb2);iActs.appendChild(shrBtn);iActs.appendChild(rvkBtn);ic.appendChild(iActs);wrap.appendChild(ic);
     });
 
     // ── INVITE A USER ──
@@ -833,9 +848,13 @@ function renderSettings(){
           const ownerName=S.owners.find(o=>o.id===ownerId)?.name||"";
           rb.style.display="block";
           rb.innerHTML='<div style="color:#4ade80;font-weight:700;font-size:13px;margin-bottom:8px">✅ Invite link ready!</div><div style="color:#94a3b8;font-size:11px;margin-bottom:4px">Role: <span style="color:#f1f5f9;font-weight:600">'+role+'</span>'+(ownerName?' · 📍 <span style="color:#f1f5f9;font-weight:600">'+ownerName+'</span>':'')+' · One use · 7 days</div><div style="background:#111827;border-radius:7px;padding:10px 12px;font-family:monospace;font-size:11px;color:#38bdf8;word-break:break-all;margin-bottom:10px">'+inviteURL+'</div>';
-          const cb3=document.createElement("button");cb3.style.cssText="width:100%;padding:12px;border-radius:9px;border:1px solid #334155;background:#1e293b;color:#f1f5f9;font-weight:700;font-size:14px;cursor:pointer;font-family:inherit;";cb3.textContent="📋 Copy Link";
+          const cb3=document.createElement("button");cb3.style.cssText="flex:1;padding:12px;border-radius:9px;border:1px solid #334155;background:#1e293b;color:#f1f5f9;font-weight:700;font-size:14px;cursor:pointer;font-family:inherit;";cb3.textContent="📋 Copy Link";
           cb3.onclick=()=>{navigator.clipboard.writeText(inviteURL).then(()=>{cb3.textContent="✅ Copied!";setTimeout(()=>{cb3.textContent="📋 Copy Link";},2500);}).catch(()=>{prompt("Copy this invite link:",inviteURL);});};
-          rb.appendChild(cb3);
+          const sh3=document.createElement("button");sh3.style.cssText="flex:1;padding:12px;border-radius:9px;border:1px solid #0ea5e933;background:#0ea5e918;color:#38bdf8;font-weight:700;font-size:14px;cursor:pointer;font-family:inherit;";sh3.textContent="📤 Share";
+          sh3.onclick=()=>shareInvite(inviteURL);
+          const btnRow3=document.createElement("div");btnRow3.style.cssText="display:flex;gap:8px;";
+          btnRow3.appendChild(cb3);btnRow3.appendChild(sh3);
+          rb.appendChild(btnRow3);
         }
         const fresh=await window.fsGetTenantInvites(S.profile.tenantId).catch(()=>[]);
         setState({invites:fresh.map(i=>({id:i._id,role:i.role,ownerId:i.ownerId,createdBy:i.createdBy,createdAt:i.createdAt,expiresAt:i.expiresAt,usedBy:i.usedBy||null,tenantId:i.tenantId}))});
