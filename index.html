@@ -1894,15 +1894,118 @@ function renderApp(){
 
   // LOG
   if(tab==="log"){
-    const displayLog=isAdmin?S.log:S.log.filter(e=>e.user===user.username||e.from===owners.find(o=>o.id===user.ownerId)?.name||e.to===owners.find(o=>o.id===user.ownerId)?.name);
-    if(displayLog.length===0)content.appendChild(el("p",{style:{color:"#334155",textAlign:"center",fontSize:"13px",marginTop:"30px"}},"No activity yet"));
-    displayLog.forEach((entry,i)=>{
-      const colors={CHECK_IN:"#22c55e",CHECK_OUT:"#f59e0b",TRANSFER:"#6366f1"};
-      const icons={CHECK_IN:"📥",CHECK_OUT:"📤",TRANSFER:"🔄"};
-      const card=el("div",{style:{background:"#111827",borderRadius:"10px",padding:"11px 14px",marginBottom:"7px",border:"1px solid #1e293b",display:"flex",gap:"12px"}});
-      card.innerHTML=`<span style="font-size:20px">${icons[entry.action]||"📋"}</span><div style="flex:1"><div style="display:flex;justify-content:space-between"><span style="color:${colors[entry.action]||"#94a3b8"};font-weight:700;font-size:12px">${entry.action?.replace("_"," ")}</span><span style="color:#334155;font-size:11px">${entry.ts?formatDate(entry.ts):""}</span></div><div style="color:#f1f5f9;font-size:13px;margin-top:2px">${entry.itemName}</div><div style="display:flex;gap:10px;margin-top:3px"><span style="color:#64748b;font-size:11px;font-family:monospace">${entry.barcode}</span><span style="color:#475569;font-size:11px">by ${entry.user}</span></div>${entry.action==="TRANSFER"?`<div style="color:#818cf8;font-size:11px;margin-top:2px">${entry.from} → ${entry.to}</div>`:""}${entry.action==="CHECK_OUT"?`<div style="color:#fb923c;font-size:11px;margin-top:2px">from ${entry.from} → Used</div>`:""}${entry.action==="CHECK_IN"&&entry.from?.startsWith("ORD-")?`<div style="color:#818cf8;font-size:11px;margin-top:2px">Order: ${entry.from}</div>`:""}</div>`;
-      content.appendChild(card);
+    const baseLog=isAdmin?S.log:S.log.filter(e=>e.user===user.username||e.from===owners.find(o=>o.id===user.ownerId)?.name||e.to===owners.find(o=>o.id===user.ownerId)?.name);
+
+    // ── Search / filter bar ──
+    const filterBar=document.createElement("div");
+    filterBar.style.cssText="margin-bottom:14px;";
+
+    // Keyword search
+    const searchRow=document.createElement("div");
+    searchRow.style.cssText="display:flex;gap:8px;margin-bottom:8px;";
+    const searchInp=document.createElement("input");
+    searchInp.type="text";searchInp.placeholder="Search item, barcode, user…";
+    searchInp.style.cssText="flex:1;background:#111827;border:1px solid #1e293b;border-radius:9px;color:#f1f5f9;padding:10px 13px;font-size:14px;font-family:inherit;outline:none;";
+    searchRow.appendChild(searchInp);
+    filterBar.appendChild(searchRow);
+
+    // Date range row
+    const dateRow=document.createElement("div");
+    dateRow.style.cssText="display:flex;gap:8px;align-items:center;flex-wrap:wrap;";
+    const dateStyle="flex:1;min-width:120px;background:#111827;border:1px solid #1e293b;border-radius:9px;color:#f1f5f9;padding:9px 11px;font-size:13px;font-family:inherit;outline:none;";
+
+    const fromLbl=document.createElement("span");
+    fromLbl.style.cssText="color:#475569;font-size:12px;white-space:nowrap;";
+    fromLbl.textContent="From";
+    const fromInp=document.createElement("input");
+    fromInp.type="date";fromInp.style.cssText=dateStyle;
+
+    const toLbl=document.createElement("span");
+    toLbl.style.cssText="color:#475569;font-size:12px;white-space:nowrap;";
+    toLbl.textContent="To";
+    const toInp=document.createElement("input");
+    toInp.type="date";toInp.style.cssText=dateStyle;
+
+    const clearBtn=document.createElement("button");
+    clearBtn.textContent="Clear";
+    clearBtn.style.cssText="background:#1e293b;border:1px solid #334155;color:#94a3b8;font-size:12px;font-weight:600;border-radius:8px;padding:9px 13px;cursor:pointer;font-family:inherit;white-space:nowrap;";
+
+    dateRow.appendChild(fromLbl);dateRow.appendChild(fromInp);
+    dateRow.appendChild(toLbl);dateRow.appendChild(toInp);
+    dateRow.appendChild(clearBtn);
+    filterBar.appendChild(dateRow);
+
+    // Result count
+    const countBadge=document.createElement("div");
+    countBadge.style.cssText="color:#475569;font-size:12px;margin-top:8px;text-align:right;";
+    filterBar.appendChild(countBadge);
+
+    content.appendChild(filterBar);
+
+    // ── Log list (rebuilt on filter change) ──
+    const listEl=document.createElement("div");
+    content.appendChild(listEl);
+
+    function applyFilters(){
+      const kw=(searchInp.value||"").toLowerCase().trim();
+      const fromDate=fromInp.value?new Date(fromInp.value+"T00:00:00"):null;
+      const toDate=toInp.value?new Date(toInp.value+"T23:59:59"):null;
+
+      const filtered=baseLog.filter(function(e){
+        if(fromDate&&new Date(e.ts)<fromDate)return false;
+        if(toDate&&new Date(e.ts)>toDate)return false;
+        if(kw){
+          const hay=(e.itemName||"")+" "+(e.barcode||"")+" "+(e.user||"")+" "+(e.action||"")+" "+(e.from||"")+" "+(e.to||"");
+          if(!hay.toLowerCase().includes(kw))return false;
+        }
+        return true;
+      });
+
+      countBadge.textContent=filtered.length+" result"+(filtered.length!==1?"s":"")+(baseLog.length!==filtered.length?" (of "+baseLog.length+" total)":"");
+      listEl.innerHTML="";
+
+      if(filtered.length===0){
+        const empty=document.createElement("p");
+        empty.style.cssText="color:#334155;font-size:13px;text-align:center;margin-top:24px;";
+        empty.textContent=baseLog.length===0?"No activity yet":"No entries match your filter";
+        listEl.appendChild(empty);
+        return;
+      }
+
+      const colors={CHECK_IN:"#22c55e",CHECK_OUT:"#f59e0b",TRANSFER:"#6366f1",ORDER_OUT:"#0ea5e9",ORDER_IN:"#22c55e",FACILITY_OUT:"#a78bfa",UNDO_CHECKOUT:"#94a3b8"};
+      const icons={CHECK_IN:"📥",CHECK_OUT:"📤",TRANSFER:"🔄",ORDER_OUT:"🚚",ORDER_IN:"📦",FACILITY_OUT:"🏥",UNDO_CHECKOUT:"↩️"};
+
+      filtered.forEach(function(entry){
+        const card=document.createElement("div");
+        card.style.cssText="background:#111827;border-radius:10px;padding:11px 14px;margin-bottom:7px;border:1px solid #1e293b;display:flex;gap:12px;";
+        const actionColor=colors[entry.action]||"#94a3b8";
+        const actionIcon=icons[entry.action]||"📋";
+        const actionLabel=(entry.action||"").replace(/_/g," ");
+        card.innerHTML="<span style='font-size:20px;flex-shrink:0'>"+actionIcon+"</span>"
+          +"<div style='flex:1;min-width:0'>"
+          +"<div style='display:flex;justify-content:space-between;gap:8px'>"
+          +"<span style='color:"+actionColor+";font-weight:700;font-size:12px'>"+actionLabel+"</span>"
+          +"<span style='color:#334155;font-size:11px;white-space:nowrap'>"+formatDate(entry.ts)+"</span>"
+          +"</div>"
+          +"<div style='color:#f1f5f9;font-size:13px;margin-top:2px'>"+(entry.itemName||"—")+"</div>"
+          +"<div style='display:flex;gap:10px;margin-top:3px;flex-wrap:wrap'>"
+          +"<span style='color:#64748b;font-size:11px;font-family:monospace'>"+(entry.barcode||"")+"</span>"
+          +"<span style='color:#475569;font-size:11px'>by "+(entry.user||"")+"</span>"
+          +"</div>"
+          +((entry.from||entry.to)?"<div style='color:#818cf8;font-size:11px;margin-top:2px'>"+(entry.from||"")+" → "+(entry.to||"")+"</div>":"")
+          +"</div>";
+        listEl.appendChild(card);
+      });
+    }
+
+    searchInp.addEventListener("input",applyFilters);
+    fromInp.addEventListener("change",applyFilters);
+    toInp.addEventListener("change",applyFilters);
+    clearBtn.addEventListener("click",function(){
+      searchInp.value="";fromInp.value="";toInp.value="";applyFilters();
     });
+
+    applyFilters();
   }
 
   wrap.appendChild(content);
