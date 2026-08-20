@@ -273,6 +273,7 @@ const S = {
   showOrderQRScan:false,   // scanning the order QR code
   showOrderSummary:false,  // confirm screen before finalizing
   pendingOrderQR:null,     // the scanned QR code for the order
+  showSettings:false,      // admin settings panel
 };
 
 function setState(u){Object.assign(S,u);render();}
@@ -741,6 +742,142 @@ function renderOrderSummary(){
   return page;
 }
 
+// ── OWNER / INVENTORY MANAGEMENT ─────────────────────────────────────────────
+async function addOwner(owner){
+  await window.fsSet("owners", owner.id, owner);
+}
+async function deleteOwner(ownerId){
+  await window.fsDelete("owners", ownerId);
+}
+
+// ── SETTINGS PANEL ────────────────────────────────────────────────────────────
+function renderSettings(){
+  const page=document.createElement("div");
+  page.style.cssText="position:fixed;inset:0;background:#0a0f1c;z-index:1000;overflow-y:auto;-webkit-overflow-scrolling:touch;";
+  const inner=document.createElement("div");
+  inner.style.cssText="max-width:480px;margin:0 auto;padding:24px 20px 48px;";
+
+  // Header
+  const hdr=document.createElement("div");
+  hdr.style.cssText="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;padding-top:8px;";
+  const title=document.createElement("h2");
+  title.style.cssText="color:#f1f5f9;font-size:22px;font-weight:800;margin:0;";
+  title.textContent="⚙️ Settings";
+  const closeBtn=document.createElement("button");
+  closeBtn.textContent="✕ Close";
+  closeBtn.style.cssText="background:#1e293b;border:1px solid #334155;color:#94a3b8;font-size:14px;border-radius:8px;padding:8px 14px;cursor:pointer;font-family:inherit;";
+  closeBtn.onclick=()=>setState({showSettings:false});
+  hdr.appendChild(title);hdr.appendChild(closeBtn);inner.appendChild(hdr);
+
+  // ── INVENTORIES SECTION ──
+  const secTitle=document.createElement("p");
+  secTitle.style.cssText="color:#475569;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;margin:0 0 10px;";
+  secTitle.textContent="Inventories";
+  inner.appendChild(secTitle);
+
+  // Existing owners list
+  const ownersList=document.createElement("div");
+  ownersList.style.cssText="margin-bottom:16px;";
+  if(S.owners.length===0){
+    const empty=document.createElement("p");
+    empty.style.cssText="color:#334155;font-size:13px;margin:0 0 12px;";
+    empty.textContent="No inventories yet — add one below.";
+    ownersList.appendChild(empty);
+  }
+  S.owners.forEach(function(owner){
+    const row=document.createElement("div");
+    row.style.cssText="background:#111827;border:1px solid #1e293b;border-radius:10px;padding:12px 14px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;";
+    const icon=owner.id.toUpperCase()==="POOL"?"🏪":owner.type==="locker"?"🗄":"👤";
+    const info=document.createElement("div");
+    info.innerHTML="<div style='color:#f1f5f9;font-weight:700;font-size:14px'>"+icon+" "+owner.name+"</div>"
+      +"<div style='color:#475569;font-size:11px;font-family:monospace;margin-top:2px'>ID: "+owner.id+" · "+owner.type+"</div>";
+    row.appendChild(info);
+    // Don't allow deleting POOL or USED
+    if(owner.id.toUpperCase()!=="POOL"&&owner.id.toUpperCase()!=="USED"){
+      const delBtn=document.createElement("button");
+      delBtn.textContent="Delete";
+      delBtn.style.cssText="background:transparent;border:1px solid #dc262633;color:#f87171;font-size:12px;font-weight:600;border-radius:7px;padding:5px 10px;cursor:pointer;font-family:inherit;";
+      delBtn.onclick=function(){
+        const hasItems=S.items.some(i=>i.ownerId===owner.id&&i.status!=="used");
+        if(hasItems){showToast("Move items out before deleting","warn");return;}
+        deleteOwner(owner.id).then(function(){
+          setState({owners:S.owners.filter(o=>o.id!==owner.id)});
+          showToast("✅ Inventory deleted");
+        }).catch(function(e){showToast("Failed: "+e.message,"err");});
+      };
+      row.appendChild(delBtn);
+    }
+    ownersList.appendChild(row);
+  });
+  inner.appendChild(ownersList);
+
+  // Add new inventory form
+  const formCard=document.createElement("div");
+  formCard.style.cssText="background:#111827;border:1px solid #1e293b;border-radius:12px;padding:16px;margin-bottom:24px;";
+  const formTitle=document.createElement("p");
+  formTitle.style.cssText="color:#94a3b8;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin:0 0 14px;";
+  formTitle.textContent="Add New Inventory";
+  formCard.appendChild(formTitle);
+
+  let newName="",newType="person",newId="";
+
+  const nameLabel=document.createElement("label");
+  nameLabel.style.cssText="color:#94a3b8;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:6px;";
+  nameLabel.textContent="Display Name";
+  const nameInput=document.createElement("input");
+  nameInput.type="text";nameInput.placeholder="e.g. Rep - John Smith, Locker A";
+  nameInput.style.cssText="width:100%;background:#0f172a;border:1px solid #334155;border-radius:9px;color:#f1f5f9;padding:11px 14px;font-size:15px;font-family:inherit;margin-bottom:12px;box-sizing:border-box;";
+  nameInput.oninput=function(){
+    newName=this.value;
+    // Auto-generate ID from name
+    newId=this.value.toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"").substring(0,20);
+    idInput.value=newId;
+  };
+  formCard.appendChild(nameLabel);formCard.appendChild(nameInput);
+
+  const typeLabel=document.createElement("label");
+  typeLabel.style.cssText="color:#94a3b8;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:6px;";
+  typeLabel.textContent="Type";
+  const typeSelect=document.createElement("select");
+  typeSelect.style.cssText="width:100%;background:#0f172a;border:1px solid #334155;border-radius:9px;color:#f1f5f9;padding:11px 14px;font-size:15px;font-family:inherit;margin-bottom:12px;box-sizing:border-box;";
+  [["person","👤 Person / Rep"],["locker","🗄 Locker / Storage"],["pool","🏪 Pool (shared stock)"]].forEach(function([val,label]){
+    const opt=document.createElement("option");opt.value=val;opt.textContent=label;typeSelect.appendChild(opt);
+  });
+  typeSelect.onchange=function(){newType=this.value;};
+  formCard.appendChild(typeLabel);formCard.appendChild(typeSelect);
+
+  const idLabel=document.createElement("label");
+  idLabel.style.cssText="color:#94a3b8;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:6px;";
+  idLabel.textContent="Unique ID (auto-generated, editable)";
+  const idInput=document.createElement("input");
+  idInput.type="text";idInput.placeholder="e.g. rep-john-smith";
+  idInput.style.cssText="width:100%;background:#0f172a;border:1px solid #334155;border-radius:9px;color:#f1f5f9;padding:11px 14px;font-size:15px;font-family:inherit;margin-bottom:16px;box-sizing:border-box;font-family:monospace;";
+  idInput.oninput=function(){newId=this.value;};
+  formCard.appendChild(idLabel);formCard.appendChild(idInput);
+
+  const addBtn=document.createElement("button");
+  addBtn.textContent="+ Add Inventory";
+  addBtn.style.cssText="width:100%;padding:13px;border-radius:10px;border:none;background:linear-gradient(135deg,#0ea5e9,#6366f1);color:#fff;font-weight:700;font-size:15px;cursor:pointer;font-family:inherit;";
+  addBtn.onclick=function(){
+    if(!newName.trim()){showToast("Enter a display name","warn");return;}
+    if(!newId.trim()){showToast("Enter a unique ID","warn");return;}
+    if(S.owners.find(o=>o.id===newId)){showToast("ID already exists — choose another","warn");return;}
+    const owner={id:newId,name:newName.trim(),type:newType};
+    addBtn.textContent="Adding…";addBtn.disabled=true;
+    addOwner(owner).then(function(){
+      setState({owners:[...S.owners,owner],showSettings:true});
+      showToast("✅ "+owner.name+" added");
+      nameInput.value="";idInput.value="";newName="";newId="";newType="person";typeSelect.value="person";
+      addBtn.textContent="+ Add Inventory";addBtn.disabled=false;
+    }).catch(function(e){showToast("Failed: "+e.message,"err");addBtn.textContent="+ Add Inventory";addBtn.disabled=false;});
+  };
+  formCard.appendChild(addBtn);
+  inner.appendChild(formCard);
+
+  page.appendChild(inner);
+  return page;
+}
+
 function render(){
   if(!S.scanning) stopScanner();
   const app=document.getElementById("app");
@@ -754,6 +891,7 @@ function render(){
   if(S.showMultiConfirm)app.appendChild(renderMultiConfirm());
   if(S.showOrderGen)app.appendChild(renderOrderGen());
   if(S.showOrderSummary)app.appendChild(renderOrderSummary());
+  if(S.showSettings)app.appendChild(renderSettings());
   if(S.modal)app.appendChild(renderModal());
   if(S.toast)app.appendChild(renderToast());
 }
@@ -899,6 +1037,11 @@ function renderApp(){
   const syncBtn=el("button",{style:{padding:"8px 10px",borderRadius:"8px",background:"#1e293b",border:"1px solid #334155",color:"#94a3b8",fontSize:"14px"}},"⟳");
   syncBtn.onclick=loadData;
   hRight.appendChild(syncBtn);
+  if(isAdmin){
+    const gearBtn=el("button",{style:{padding:"8px 10px",borderRadius:"8px",background:"#1e293b",border:"1px solid #334155",color:"#94a3b8",fontSize:"16px"}},"⚙️");
+    gearBtn.onclick=()=>setState({showSettings:true});
+    hRight.appendChild(gearBtn);
+  }
   header.appendChild(logo);header.appendChild(hRight);
   wrap.appendChild(header);
 
