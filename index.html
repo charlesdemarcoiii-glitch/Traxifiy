@@ -600,18 +600,25 @@ function handleScan(barcode){
 }
 
 // ── SCANNER ───────────────────────────────────────────────────────────────────
-let scanStream=null,scanInterval=null;
+let scanStream=null,scanInterval=null,scanActive=false;
 function startScanner(){
+  scanActive=true;
   const video=document.getElementById("scan-video");
   const canvas=document.getElementById("scan-canvas");
   const status=document.getElementById("scan-status");
   if(!video||!canvas)return;
   navigator.mediaDevices.getUserMedia({video:{facingMode:"environment",width:{ideal:1280},height:{ideal:720}}})
     .then(stream=>{
+      // If stopScanner() was called before this promise resolved, kill the stream immediately
+      if(!scanActive){
+        stream.getTracks().forEach(t=>t.stop());
+        return;
+      }
       scanStream=stream;video.srcObject=stream;video.play();
       if(window.jsQR){
         if(status)status.textContent=S.scanHint||"Point camera at QR code";
         scanInterval=setInterval(()=>{
+          if(!scanActive){clearInterval(scanInterval);return;}
           if(video.readyState!==4)return;
           const size=Math.min(video.videoWidth,video.videoHeight)*0.8;
           const x=(video.videoWidth-size)/2,y=(video.videoHeight-size)/2;
@@ -627,6 +634,7 @@ function startScanner(){
     .catch(()=>{const s=document.getElementById("scan-status");if(s)s.textContent="Camera unavailable — type code below";});
 }
 function stopScanner(){
+  scanActive=false;
   clearInterval(scanInterval);scanInterval=null;
   if(scanStream){scanStream.getTracks().forEach(t=>t.stop());scanStream=null;}
   // iOS Safari requires nulling srcObject to fully release the camera hardware
