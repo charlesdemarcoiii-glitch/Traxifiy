@@ -628,6 +628,9 @@ function startScanner(){
 function stopScanner(){
   clearInterval(scanInterval);scanInterval=null;
   if(scanStream){scanStream.getTracks().forEach(t=>t.stop());scanStream=null;}
+  // iOS Safari requires nulling srcObject to fully release the camera hardware
+  const video=document.getElementById("scan-video");
+  if(video){video.pause();video.srcObject=null;}
 }
 
 // ── EL HELPER ─────────────────────────────────────────────────────────────────
@@ -2581,9 +2584,11 @@ function showInstallBanner() {
 }
 
 // Stop camera when user switches tabs or minimizes the app
+// pagehide is more reliable than visibilitychange on iOS Safari
 document.addEventListener("visibilitychange", function(){
   if(document.hidden) stopScanner();
 });
+window.addEventListener("pagehide", function(){ stopScanner(); });
 </script>
 </body>
 </html>
