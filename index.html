@@ -150,34 +150,34 @@ async function fsWaitForReady(){
 
 async function getItemNames(){
   await fsWaitForReady();
-  try{ return await window.fsGetAll("itemNames"); }
+  try{ return await window.fsGetAll(oc("itemNames")); }
   catch(e){ return []; }
 }
 
 async function addItemName(name){
   const id="item-"+Date.now();
-  await window.fsSet("itemNames", id, {name:name, addedAt:new Date().toISOString()});
+  await window.fsSet(oc("itemNames"), id, {name:name, addedAt:new Date().toISOString()});
   return id;
 }
 
 async function getFacilities(){
   await fsWaitForReady();
-  try{ return await window.fsGetAll("facilities"); }
+  try{ return await window.fsGetAll(oc("facilities")); }
   catch(e){ return []; }
 }
 
 async function addFacility(facility){
-  await window.fsSet("facilities", facility.id, facility);
+  await window.fsSet(oc("facilities"), facility.id, facility);
 }
 
 async function getItems(){
   await fsWaitForReady();
-  return await window.fsGetAll("items");
+  return await window.fsGetAll(oc("items"));
 }
 
 async function getOwners(){
   await fsWaitForReady();
-  return await window.fsGetAll("owners");
+  return await window.fsGetAll(oc("owners"));
 }
 
 async function getUsers(){
@@ -187,7 +187,7 @@ async function getUsers(){
   // Always fetch own record first — this is always allowed per security rules
   let ownRecord = null;
   try{
-    ownRecord = await window.fsGetOne("users", S.user.email);
+    ownRecord = await window.fsGetOne(oc("users"), S.user.email);
   }catch(e){
     console.error("Could not load own user record:",e);
   }
@@ -196,7 +196,7 @@ async function getUsers(){
 
   if(isAdmin){
     try{
-      const all = await window.fsGetAll("users");
+      const all = await window.fsGetAll(oc("users"));
       return all.length>0 ? all : (ownRecord?[ownRecord]:[]);
     }catch(e){
       console.warn("Could not load all users, falling back to own record:",e);
@@ -208,36 +208,36 @@ async function getUsers(){
 
 async function getOrders(){
   await fsWaitForReady();
-  return await window.fsGetAll("orders");
+  return await window.fsGetAll(oc("orders"));
 }
 
 async function getLog(){
   await fsWaitForReady();
-  return await window.fsGetAll("log");
+  return await window.fsGetAll(oc("log"));
 }
 
 async function addItem(item){
-  await window.fsSet("items", item.barcode, item);
+  await window.fsSet(oc("items"), item.barcode, item);
 }
 
 async function updateItem(barcode, data){
-  await window.fsUpdate("items", barcode, data);
+  await window.fsUpdate(oc("items"), barcode, data);
 }
 
 async function addLog(entry){
-  await window.fsAdd("log", entry);
+  await window.fsAdd(oc("log"), entry);
 }
 
 async function addOrder(order){
-  await window.fsSet("orders", order.id, order);
+  await window.fsSet(oc("orders"), order.id, order);
 }
 
 async function updateOrder(orderId, data){
-  await window.fsUpdate("orders", orderId, data);
+  await window.fsUpdate(oc("orders"), orderId, data);
 }
 
 async function findItemRow(barcode){
-  const item = await window.fsGetOne("items", barcode);
+  const item = await window.fsGetOne(oc("items"), barcode);
   if(!item) return null;
   // Return in a format compatible with existing code: {rowNum, data: [barcode,name,type,expDate,ownerId,status,addedAt,usedBy]}
   return {
@@ -246,9 +246,13 @@ async function findItemRow(barcode){
   };
 }
 
+// ── ORG HELPER ────────────────────────────────────────────────────────────────
+function oc(col){ return "orgs/"+S.orgId+"/"+col; }
+
 // ── STATE ─────────────────────────────────────────────────────────────────────
 const S = {
   user:null,users:[],owners:[],items:[],orders:[],log:[],
+  orgId:null,orgName:null,orgInviteCode:null,
   accounts:[],        // all signed-in accounts [{username,password,role,ownerId}]
   showAccountMenu:false, // account switcher dropdown
   tab:"dashboard",loading:false,toast:null,toastTimer:null,
@@ -320,7 +324,7 @@ async function loadData(){
 // ── ACTIONS ───────────────────────────────────────────────────────────────────
 async function saveUserAccess(username, viewableOwners){
   // Update Firestore
-  await window.fsUpdate("users", username, {viewableOwners: viewableOwners});
+  await window.fsUpdate(oc("users"), username, {viewableOwners: viewableOwners});
   // Update local state
   const updatedUsers=S.users.map(u=>u.username===username?{...u,viewableOwners:viewableOwners}:u);
   setState({users:updatedUsers});
@@ -750,12 +754,175 @@ function renderOrderSummary(){
   return page;
 }
 
+// ── MULTI-TENANT: CREATE / JOIN ───────────────────────────────────────────────
+function genCode(){ return Math.random().toString(36).substr(2,6).toUpperCase(); }
+
+async function createOrg(orgName, adminEmail){
+  const slug=orgName.toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"").substring(0,24);
+  const orgId=slug+"-"+Math.random().toString(36).substr(2,4);
+  const inviteCode=genCode();
+  await window.fsSet("orgs",orgId,{name:orgName,createdBy:adminEmail,createdAt:new Date().toISOString(),inviteCode});
+  await window.fsSet("orgs/"+orgId+"/users",adminEmail,{role:"admin",ownerId:"",viewableOwners:[]});
+  await window.fsSet("userOrgs",adminEmail,{orgId});
+  return {orgId,inviteCode,orgName};
+}
+
+async function joinOrgByCode(code, userEmail){
+  const allOrgs=await window.fsGetAll("orgs");
+  const org=allOrgs.find(o=>(o.inviteCode||"").toUpperCase()===(code||"").toUpperCase().trim());
+  if(!org) throw new Error("Invalid invite code — check with your admin");
+  const orgId=org._id;
+  await window.fsSet("orgs/"+orgId+"/users",userEmail,{role:"user",ownerId:"",viewableOwners:[]});
+  await window.fsSet("userOrgs",userEmail,{orgId});
+  return {orgId,orgName:org.name,orgInviteCode:org.inviteCode};
+}
+
+// ── ONBOARDING SCREEN ─────────────────────────────────────────────────────────
+function renderOnboarding(){
+  const {user}=S;
+  let mode=null; // "create" | "join"
+  let orgNameVal="", codeVal="";
+
+  const page=document.createElement("div");
+  page.style.cssText="min-height:100vh;background:#0a0f1c;display:flex;align-items:center;justify-content:center;padding:24px;";
+  const card=document.createElement("div");
+  card.style.cssText="width:100%;max-width:380px;";
+
+  function rebuild(){
+    card.innerHTML="";
+
+    // Logo
+    const logo=document.createElement("div");
+    logo.style.cssText="text-align:center;margin-bottom:32px;";
+    logo.innerHTML="<div style='font-size:48px;margin-bottom:10px'>📦</div>"
+      +"<h1 style='font-weight:800;font-size:26px;background:linear-gradient(90deg,#38bdf8,#818cf8);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin:0'>Traxify</h1>"
+      +"<p style='color:#475569;font-size:13px;margin:8px 0 0'>Welcome, "+user.email+"</p>";
+    card.appendChild(logo);
+
+    if(!mode){
+      // Choice screen
+      const sub=document.createElement("p");
+      sub.style.cssText="color:#64748b;font-size:13px;text-align:center;margin:0 0 24px;";
+      sub.textContent="Get started by creating a new inventory or joining one your admin set up.";
+      card.appendChild(sub);
+
+      [
+        ["create","🏢","Create New Inventory","Set up a new organization as admin"],
+        ["join","🔗","Join with Invite Code","Enter the code your admin shared with you"],
+      ].forEach(function([m,icon,label,sub]){
+        const btn=document.createElement("button");
+        btn.style.cssText="width:100%;padding:18px 16px;border-radius:14px;border:1px solid #1e293b;background:#111827;color:#f1f5f9;font-weight:700;font-size:15px;display:flex;align-items:center;gap:14px;margin-bottom:12px;cursor:pointer;text-align:left;font-family:inherit;";
+        btn.innerHTML="<span style='font-size:28px'>"+icon+"</span><div><div>"+label+"</div><div style='font-size:12px;font-weight:400;color:#64748b;margin-top:3px'>"+sub+"</div></div>";
+        btn.onclick=function(){mode=m;rebuild();};
+        card.appendChild(btn);
+      });
+
+      const outBtn=document.createElement("button");
+      outBtn.style.cssText="width:100%;padding:12px;border-radius:9px;border:1px solid #334155;background:transparent;color:#475569;font-size:13px;cursor:pointer;margin-top:4px;font-family:inherit;";
+      outBtn.textContent="Sign out";
+      outBtn.onclick=function(){if(window.firebaseSignOut)window.firebaseSignOut();setState({user:null,orgId:null,accounts:[],tab:"dashboard"});};
+      card.appendChild(outBtn);
+
+    } else if(mode==="create"){
+      const hdr=document.createElement("div");
+      hdr.style.cssText="display:flex;align-items:center;gap:10px;margin-bottom:20px;";
+      const back=document.createElement("button");
+      back.style.cssText="background:none;border:none;color:#64748b;font-size:20px;cursor:pointer;padding:0;line-height:1;";
+      back.textContent="←";back.onclick=function(){mode=null;rebuild();};
+      hdr.appendChild(back);
+      const t=document.createElement("h2");
+      t.style.cssText="color:#f1f5f9;font-size:18px;font-weight:700;margin:0;";
+      t.textContent="🏢 Create Organization";
+      hdr.appendChild(t);
+      card.appendChild(hdr);
+
+      const lbl=document.createElement("label");
+      lbl.style.cssText="color:#94a3b8;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:6px;";
+      lbl.textContent="Organization / Company Name";
+      const inp=document.createElement("input");
+      inp.type="text";inp.placeholder="e.g. Acme Medical Distribution";
+      inp.style.cssText="width:100%;background:#0f172a;border:1px solid #334155;border-radius:9px;color:#f1f5f9;padding:13px 14px;font-size:15px;font-family:inherit;margin-bottom:16px;box-sizing:border-box;";
+      inp.oninput=function(){orgNameVal=this.value;};
+      inp.onkeydown=function(e){if(e.key==="Enter")doCreate();};
+      card.appendChild(lbl);card.appendChild(inp);
+
+      const errDiv=document.createElement("div");errDiv.style.cssText="min-height:20px;margin-bottom:8px;";
+      card.appendChild(errDiv);
+
+      const btn=document.createElement("button");
+      btn.style.cssText="width:100%;padding:16px;border-radius:12px;border:none;background:linear-gradient(135deg,#0ea5e9,#6366f1);color:#fff;font-weight:700;font-size:16px;cursor:pointer;font-family:inherit;";
+      btn.textContent="Create & Get Invite Code →";
+      btn.onclick=doCreate;
+      card.appendChild(btn);
+
+      function doCreate(){
+        if(!orgNameVal.trim()){errDiv.innerHTML="<p style='color:#f87171;font-size:13px;text-align:center;margin:0'>Enter your organization name</p>";return;}
+        btn.textContent="Creating…";btn.disabled=true;
+        createOrg(orgNameVal.trim(), user.email).then(function(result){
+          setState({orgId:result.orgId,orgName:result.orgName,orgInviteCode:result.inviteCode,user:{...S.user,role:"admin"}});
+          loadData();
+          showToast("✅ Organization created! Invite code: "+result.inviteCode);
+        }).catch(function(e){errDiv.innerHTML="<p style='color:#f87171;font-size:13px;text-align:center;margin:0'>"+e.message+"</p>";btn.textContent="Create & Get Invite Code →";btn.disabled=false;});
+      }
+      setTimeout(function(){inp.focus();},100);
+
+    } else if(mode==="join"){
+      const hdr=document.createElement("div");
+      hdr.style.cssText="display:flex;align-items:center;gap:10px;margin-bottom:20px;";
+      const back=document.createElement("button");
+      back.style.cssText="background:none;border:none;color:#64748b;font-size:20px;cursor:pointer;padding:0;line-height:1;";
+      back.textContent="←";back.onclick=function(){mode=null;rebuild();};
+      hdr.appendChild(back);
+      const t=document.createElement("h2");
+      t.style.cssText="color:#f1f5f9;font-size:18px;font-weight:700;margin:0;";
+      t.textContent="🔗 Join with Invite Code";
+      hdr.appendChild(t);
+      card.appendChild(hdr);
+
+      const lbl=document.createElement("label");
+      lbl.style.cssText="color:#94a3b8;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:6px;";
+      lbl.textContent="Invite Code";
+      const inp=document.createElement("input");
+      inp.type="text";inp.placeholder="e.g. X4R9K2";
+      inp.maxLength=6;
+      inp.style.cssText="width:100%;background:#0f172a;border:1px solid #334155;border-radius:9px;color:#f1f5f9;padding:13px 14px;font-size:22px;font-family:monospace;letter-spacing:.15em;text-transform:uppercase;text-align:center;margin-bottom:16px;box-sizing:border-box;";
+      inp.oninput=function(){codeVal=this.value.toUpperCase();this.value=codeVal;};
+      inp.onkeydown=function(e){if(e.key==="Enter")doJoin();};
+      card.appendChild(lbl);card.appendChild(inp);
+
+      const errDiv=document.createElement("div");errDiv.style.cssText="min-height:20px;margin-bottom:8px;";
+      card.appendChild(errDiv);
+
+      const btn=document.createElement("button");
+      btn.style.cssText="width:100%;padding:16px;border-radius:12px;border:none;background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff;font-weight:700;font-size:16px;cursor:pointer;font-family:inherit;";
+      btn.textContent="Join Inventory →";
+      btn.onclick=doJoin;
+      card.appendChild(btn);
+
+      function doJoin(){
+        if(!codeVal.trim()||codeVal.length<4){errDiv.innerHTML="<p style='color:#f87171;font-size:13px;text-align:center;margin:0'>Enter the invite code from your admin</p>";return;}
+        btn.textContent="Joining…";btn.disabled=true;
+        joinOrgByCode(codeVal,user.email).then(function(result){
+          setState({orgId:result.orgId,orgName:result.orgName,orgInviteCode:result.orgInviteCode});
+          loadData();
+          showToast("✅ Joined "+result.orgName+"!");
+        }).catch(function(e){errDiv.innerHTML="<p style='color:#f87171;font-size:13px;text-align:center;margin:0'>"+e.message+"</p>";btn.textContent="Join Inventory →";btn.disabled=false;});
+      }
+      setTimeout(function(){inp.focus();},100);
+    }
+  }
+
+  rebuild();
+  page.appendChild(card);
+  return page;
+}
+
 // ── OWNER / INVENTORY MANAGEMENT ─────────────────────────────────────────────
 async function addOwner(owner){
-  await window.fsSet("owners", owner.id, owner);
+  await window.fsSet(oc("owners"), owner.id, owner);
 }
 async function deleteOwner(ownerId){
-  await window.fsDelete("owners", ownerId);
+  await window.fsDelete(oc("owners"), ownerId);
 }
 
 // ── SETTINGS PANEL ────────────────────────────────────────────────────────────
@@ -778,6 +945,21 @@ function renderSettings(){
   hdr.appendChild(title);hdr.appendChild(closeBtn);inner.appendChild(hdr);
 
   // ── INVENTORIES SECTION ──
+  // ── INVITE CODE CARD ──
+  const inviteCard=document.createElement("div");
+  inviteCard.style.cssText="background:linear-gradient(135deg,#6366f118,#0ea5e918);border:1px solid #6366f133;border-radius:14px;padding:18px;margin-bottom:20px;";
+  inviteCard.innerHTML="<div style='color:#94a3b8;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px'>Organization</div>"
+    +"<div style='color:#f1f5f9;font-weight:700;font-size:16px;margin-bottom:12px'>"+(S.orgName||S.orgId)+"</div>"
+    +"<div style='color:#94a3b8;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px'>Invite Code</div>"
+    +"<div style='display:flex;align-items:center;gap:10px;'>"
+    +"<div style='background:#0f172a;border:1px solid #334155;border-radius:8px;padding:10px 16px;font-family:monospace;font-size:24px;font-weight:700;color:#38bdf8;letter-spacing:.12em'>"+(S.orgInviteCode||"—")+"</div>"
+    +"<button id='copy-invite-btn' style='background:#1e293b;border:1px solid #334155;color:#94a3b8;font-size:13px;font-weight:600;border-radius:8px;padding:10px 14px;cursor:pointer;font-family:inherit;'>Copy</button>"
+    +"</div>"
+    +"<div style='color:#475569;font-size:12px;margin-top:8px'>Share this code with your team so they can join.</div>";
+  inner.appendChild(inviteCard);
+  const copyBtn=document.getElementById("copy-invite-btn");
+  if(copyBtn){copyBtn.onclick=function(){navigator.clipboard.writeText(S.orgInviteCode||"").then(function(){copyBtn.textContent="Copied!";setTimeout(function(){copyBtn.textContent="Copy";},2000);});};}
+
   const secTitle=document.createElement("p");
   secTitle.style.cssText="color:#475569;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;margin:0 0 10px;";
   secTitle.textContent="Inventories";
@@ -891,6 +1073,7 @@ function render(){
   const app=document.getElementById("app");
   app.innerHTML="";
   if(!S.user){app.appendChild(renderLogin());return;}
+  if(!S.orgId){app.appendChild(renderOnboarding());return;}
   app.appendChild(renderApp());
   if(S.scanning){app.appendChild(renderScanner());setTimeout(startScanner,100);}
   if(S.showScanPrompt)app.appendChild(renderScanPrompt());
@@ -944,20 +1127,33 @@ function renderLogin(){
       .then(async cred=>{
         const firebaseEmail=cred.user.email;
         await fsWaitForReady();
-        // Fetch the user's own record directly from Firestore (always allowed by security rules)
-        let userRecord=null;
-        try{
-          userRecord=await window.fsGetOne("users",firebaseEmail);
-        }catch(e){
-          console.error("Could not fetch user record:",e);
+
+        // Step 1: find which org this user belongs to
+        let userOrgData=null;
+        try{ userOrgData=await window.fsGetOne("userOrgs",firebaseEmail); }catch(e){}
+
+        if(!userOrgData||!userOrgData.orgId){
+          // No org yet — show onboarding
+          const u={username:firebaseEmail,email:firebaseEmail,role:"user",ownerId:""};
+          const existing=S.accounts.find(a=>a.username.toLowerCase()===u.username.toLowerCase());
+          setState({user:u,orgId:null,orgName:null,orgInviteCode:null,accounts:existing?S.accounts:[...S.accounts,u],showAccountMenu:false});
+          return;
         }
-        const u = userRecord
-          ? {username:firebaseEmail,email:firebaseEmail,role:userRecord.role||"user",ownerId:userRecord.ownerId||""}
-          : {username:firebaseEmail,email:firebaseEmail,role:"user",ownerId:""};
+
+        const orgId=userOrgData.orgId;
+
+        // Step 2: fetch user record and org info in parallel
+        let userRecord=null,orgInfo=null;
+        try{ userRecord=await window.fsGetOne("orgs/"+orgId+"/users",firebaseEmail); }catch(e){}
+        try{ orgInfo=await window.fsGetOne("orgs",orgId); }catch(e){}
+
+        const u=userRecord
+          ?{username:firebaseEmail,email:firebaseEmail,role:userRecord.role||"user",ownerId:userRecord.ownerId||""}
+          :{username:firebaseEmail,email:firebaseEmail,role:"user",ownerId:""};
         const existing=S.accounts.find(a=>a.username.toLowerCase()===u.username.toLowerCase());
         const accounts=existing?S.accounts:[...S.accounts,u];
-        setState({user:u,accounts,showAccountMenu:false});
-        loadData(); // load data immediately after login
+        setState({user:u,orgId,orgName:orgInfo?.name||orgId,orgInviteCode:orgInfo?.inviteCode||"",accounts,showAccountMenu:false});
+        loadData();
       })
       .catch(err=>{
         let msg="Incorrect email or password";
@@ -991,7 +1187,7 @@ function renderApp(){
   // HEADER
   const header=el("div",{style:{background:"#111827",borderBottom:"1px solid #1e293b",padding:"14px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",position:"sticky",top:"0",zIndex:"100"}});
   const logo=el("div",{style:{display:"flex",alignItems:"center",gap:"10px"}});
-  logo.innerHTML=`<span style="font-size:22px">📦</span><span style="font-weight:800;font-size:18px;background:linear-gradient(90deg,#38bdf8,#818cf8);-webkit-background-clip:text;-webkit-text-fill-color:transparent">Traxify</span>`;
+  logo.innerHTML=`<span style="font-size:22px">📦</span><div><span style="font-weight:800;font-size:18px;background:linear-gradient(90deg,#38bdf8,#818cf8);-webkit-background-clip:text;-webkit-text-fill-color:transparent">Traxify</span>${S.orgName?`<div style="color:#475569;font-size:10px;font-weight:600;margin-top:-1px;letter-spacing:.03em">${S.orgName}</div>`:""}</div>`;
   const hRight=el("div",{style:{display:"flex",alignItems:"center",gap:"8px",position:"relative"}});
   
   // Account switcher button
@@ -1418,7 +1614,7 @@ function renderApp(){
           delBtn.onclick=function(){
             if(confirm("Delete facility '"+facility.name+"'? Items here will need to be transferred out first.")){
               if(facItems.length>0){showToast("Move items out of this facility first","warn");return;}
-              window.fsDelete("facilities",facility.id).then(function(){
+              window.fsDelete(oc("facilities"),facility.id).then(function(){
                 setState({facilities:S.facilities.filter(f=>f.id!==facility.id)});
                 showToast("✅ Facility deleted");
               }).catch(function(e){showToast("Failed: "+e.message,"err");});
