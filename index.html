@@ -18,7 +18,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-    import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+    import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
     import { getFirestore, collection, doc, getDocs, getDoc, setDoc, addDoc, updateDoc, query, where } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
    const firebaseConfig = {
@@ -37,6 +37,7 @@
     // Expose Auth to global scope
     window.firebaseAuth = auth;
     window.firebaseSignIn = (email, password) => signInWithEmailAndPassword(auth, email, password);
+    window.firebaseCreateUser = (email, password) => createUserWithEmailAndPassword(auth, email, password);
     window.firebaseSignOut = () => signOut(auth);
     window.onAuthStateChanged = (callback) => onAuthStateChanged(auth, callback);
 
@@ -1089,83 +1090,214 @@ function render(){
 
 // ── LOGIN ─────────────────────────────────────────────────────────────────────
 function renderLogin(){
-  let email="",password="",showPass=false;
-  const div=el("div",{style:{minHeight:"100vh",background:"#0a0f1c",display:"flex",alignItems:"center",justifyContent:"center",padding:"24px"}});
-  const card=el("div",{style:{width:"100%",maxWidth:"380px",background:"#111827",borderRadius:"20px",padding:"32px",border:"1px solid #1e293b"}});
-  const icon=el("div",{style:{textAlign:"center",marginBottom:"32px"}});
-  icon.innerHTML=`<div style="font-size:48px;margin-bottom:10px">📦</div><h1 style="font-weight:800;font-size:26px;background:linear-gradient(90deg,#38bdf8,#818cf8);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin:0">Traxify</h1><p style="color:#475569;font-size:14px;margin:8px 0 0">Sign in to your inventory</p>`;
-  card.appendChild(icon);
+  let mode=null; // null | "signin" | "newuser"
+  let email="",password="",confirm="",showPass=false;
 
-  const eLabel=el("label",{class:"label"},"Email");
-  const eInput=el("input",{type:"email",placeholder:"Enter your email"});
-  eInput.oninput=e=>email=e.target.value;
-  eInput.onkeydown=e=>{if(e.key==="Enter")doLogin();};
-  card.appendChild(eLabel);card.appendChild(eInput);card.appendChild(el("div",{style:{height:"16px"}}));
+  const wrap=document.createElement("div");
+  wrap.style.cssText="min-height:100vh;background:#0a0f1c;display:flex;align-items:center;justify-content:center;padding:24px;";
+  const card=document.createElement("div");
+  card.style.cssText="width:100%;max-width:380px;";
+  wrap.appendChild(card);
 
-  const pLabel=el("label",{class:"label"},"Password");
-  const pWrap=el("div",{style:{position:"relative"}});
-  const pInput=el("input",{type:"password",placeholder:"Enter password",style:{paddingRight:"48px"}});
-  pInput.oninput=e=>password=e.target.value;
-  pInput.onkeydown=e=>{if(e.key==="Enter")doLogin();};
-  const eyeBtn=el("button",{style:{position:"absolute",right:"14px",top:"50%",transform:"translateY(-50%)",background:"none",border:"none",color:"#475569",fontSize:"18px",padding:"0"}},"👁");
-  eyeBtn.onclick=()=>{showPass=!showPass;pInput.type=showPass?"text":"password";eyeBtn.textContent=showPass?"🙈":"👁";};
-  pWrap.appendChild(pInput);pWrap.appendChild(eyeBtn);
-  card.appendChild(pLabel);card.appendChild(pWrap);
+  function rebuild(){
+    card.innerHTML="";
+    email="";password="";confirm="";
 
-  const errDiv=el("div",{style:{minHeight:"28px"}});
-  card.appendChild(errDiv);
+    // Logo
+    const logo=document.createElement("div");
+    logo.style.cssText="text-align:center;margin-bottom:32px;";
+    logo.innerHTML="<div style='font-size:52px;margin-bottom:10px'>📦</div>"
+      +"<h1 style='font-weight:800;font-size:28px;background:linear-gradient(90deg,#38bdf8,#818cf8);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin:0'>Traxify</h1>"
+      +"<p style='color:#475569;font-size:13px;margin:8px 0 0'>Medical distribution inventory tracking</p>";
+    card.appendChild(logo);
 
-  const loginBtn=el("button",{class:"btn btn-primary",style:{marginTop:"16px"}},"Sign In →");
-  loginBtn.onclick=doLogin;
-  card.appendChild(loginBtn);
+    // ── HOME: choose path ──
+    if(!mode){
+      const sub=document.createElement("p");
+      sub.style.cssText="color:#64748b;font-size:13px;text-align:center;margin:0 0 24px;line-height:1.5;";
+      sub.textContent="Are you a new or returning user?";
+      card.appendChild(sub);
 
-  function doLogin(){
-    if(!email||!password){errDiv.innerHTML=`<p style="color:#f87171;font-size:13px;text-align:center;margin:8px 0 0">⚠ Enter email and password</p>`;return;}
-    loginBtn.textContent="Signing in…";loginBtn.disabled=true;
-    if(!window.firebaseSignIn){errDiv.innerHTML=`<p style="color:#f87171;font-size:13px;text-align:center;margin:8px 0 0">⚠ Auth not loaded yet, try again</p>`;loginBtn.textContent="Sign In →";loginBtn.disabled=false;return;}
-    window.firebaseSignIn(email,password)
-      .then(async cred=>{
-        const firebaseEmail=cred.user.email;
-        await fsWaitForReady();
-
-        // Step 1: find which org this user belongs to
-        let userOrgData=null;
-        try{ userOrgData=await window.fsGetOne("userOrgs",firebaseEmail); }catch(e){}
-
-        if(!userOrgData||!userOrgData.orgId){
-          // No org yet — show onboarding
-          const u={username:firebaseEmail,email:firebaseEmail,role:"user",ownerId:""};
-          const existing=S.accounts.find(a=>a.username.toLowerCase()===u.username.toLowerCase());
-          setState({user:u,orgId:null,orgName:null,orgInviteCode:null,accounts:existing?S.accounts:[...S.accounts,u],showAccountMenu:false});
-          return;
-        }
-
-        const orgId=userOrgData.orgId;
-
-        // Step 2: fetch user record and org info in parallel
-        let userRecord=null,orgInfo=null;
-        try{ userRecord=await window.fsGetOne("orgs/"+orgId+"/users",firebaseEmail); }catch(e){}
-        try{ orgInfo=await window.fsGetOne("orgs",orgId); }catch(e){}
-
-        const u=userRecord
-          ?{username:firebaseEmail,email:firebaseEmail,role:userRecord.role||"user",ownerId:userRecord.ownerId||""}
-          :{username:firebaseEmail,email:firebaseEmail,role:"user",ownerId:""};
-        const existing=S.accounts.find(a=>a.username.toLowerCase()===u.username.toLowerCase());
-        const accounts=existing?S.accounts:[...S.accounts,u];
-        setState({user:u,orgId,orgName:orgInfo?.name||orgId,orgInviteCode:orgInfo?.inviteCode||"",accounts,showAccountMenu:false});
-        loadData();
-      })
-      .catch(err=>{
-        let msg="Incorrect email or password";
-        if(err.code==="auth/user-not-found")msg="No account found with this email";
-        if(err.code==="auth/wrong-password")msg="Incorrect password";
-        if(err.code==="auth/invalid-email")msg="Invalid email address";
-        if(err.code==="auth/too-many-requests")msg="Too many attempts — try again later";
-        errDiv.innerHTML=`<p style="color:#f87171;font-size:13px;text-align:center;margin:8px 0 0">⚠ ${msg}</p>`;
-        loginBtn.textContent="Sign In →";loginBtn.disabled=false;
+      [
+        ["newuser","✨","New User","Create an account or join an existing inventory"],
+        ["signin","🔑","Current User","Sign in with your email and password"],
+      ].forEach(function([m,icon,label,desc]){
+        const btn=document.createElement("button");
+        btn.style.cssText="width:100%;padding:18px 16px;border-radius:14px;border:1px solid #1e293b;background:#111827;color:#f1f5f9;font-weight:700;font-size:15px;display:flex;align-items:center;gap:14px;margin-bottom:12px;cursor:pointer;text-align:left;font-family:inherit;";
+        btn.innerHTML="<span style='font-size:28px;flex-shrink:0'>"+icon+"</span><div><div style='font-size:15px;font-weight:700'>"+label+"</div><div style='font-size:12px;font-weight:400;color:#64748b;margin-top:3px'>"+desc+"</div></div>";
+        btn.onclick=function(){mode=m;rebuild();};
+        card.appendChild(btn);
       });
+
+    // ── SIGN IN: existing user ──
+    } else if(mode==="signin"){
+      const hdr=document.createElement("div");
+      hdr.style.cssText="display:flex;align-items:center;gap:10px;margin-bottom:24px;";
+      const back=document.createElement("button");
+      back.style.cssText="background:none;border:none;color:#64748b;font-size:22px;cursor:pointer;padding:0;line-height:1;";
+      back.textContent="←";back.onclick=function(){mode=null;rebuild();};
+      hdr.appendChild(back);
+      const t=document.createElement("h2");
+      t.style.cssText="color:#f1f5f9;font-size:18px;font-weight:700;margin:0;";
+      t.textContent="🔑 Sign In";
+      hdr.appendChild(t);
+      card.appendChild(hdr);
+
+      const box=document.createElement("div");
+      box.style.cssText="background:#111827;border-radius:16px;padding:24px;border:1px solid #1e293b;";
+
+      const eL=document.createElement("label");
+      eL.style.cssText="color:#94a3b8;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:6px;";
+      eL.textContent="Email";
+      const eI=document.createElement("input");
+      eI.type="email";eI.placeholder="your@email.com";
+      eI.style.cssText="width:100%;background:#0f172a;border:1px solid #334155;border-radius:9px;color:#f1f5f9;padding:13px 14px;font-size:15px;font-family:inherit;margin-bottom:14px;box-sizing:border-box;outline:none;";
+      eI.oninput=function(){email=this.value;};
+      eI.onkeydown=function(e){if(e.key==="Enter")doSignIn();};
+      box.appendChild(eL);box.appendChild(eI);
+
+      const pL=document.createElement("label");
+      pL.style.cssText="color:#94a3b8;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:6px;";
+      pL.textContent="Password";
+      const pWrap=document.createElement("div");
+      pWrap.style.cssText="position:relative;margin-bottom:6px;";
+      const pI=document.createElement("input");
+      pI.type="password";pI.placeholder="Enter password";
+      pI.style.cssText="width:100%;background:#0f172a;border:1px solid #334155;border-radius:9px;color:#f1f5f9;padding:13px 48px 13px 14px;font-size:15px;font-family:inherit;box-sizing:border-box;outline:none;";
+      pI.oninput=function(){password=this.value;};
+      pI.onkeydown=function(e){if(e.key==="Enter")doSignIn();};
+      const eye=document.createElement("button");
+      eye.style.cssText="position:absolute;right:14px;top:50%;transform:translateY(-50%);background:none;border:none;color:#475569;font-size:18px;padding:0;cursor:pointer;";
+      eye.textContent="👁";
+      eye.onclick=function(){showPass=!showPass;pI.type=showPass?"text":"password";eye.textContent=showPass?"🙈":"👁";};
+      pWrap.appendChild(pI);pWrap.appendChild(eye);
+      box.appendChild(pL);box.appendChild(pWrap);
+
+      const errDiv=document.createElement("div");
+      errDiv.style.cssText="min-height:24px;margin-bottom:4px;";
+      box.appendChild(errDiv);
+
+      const signInBtn=document.createElement("button");
+      signInBtn.style.cssText="width:100%;padding:14px;border-radius:10px;border:none;background:linear-gradient(135deg,#0ea5e9,#6366f1);color:#fff;font-weight:700;font-size:16px;cursor:pointer;font-family:inherit;margin-top:8px;";
+      signInBtn.textContent="Sign In →";
+      signInBtn.onclick=doSignIn;
+      box.appendChild(signInBtn);
+      card.appendChild(box);
+
+      function doSignIn(){
+        if(!email||!password){errDiv.innerHTML="<p style='color:#f87171;font-size:13px;text-align:center;margin:6px 0 0'>⚠ Enter email and password</p>";return;}
+        signInBtn.textContent="Signing in…";signInBtn.disabled=true;
+        window.firebaseSignIn(email,password)
+          .then(async function(cred){
+            const firebaseEmail=cred.user.email;
+            await fsWaitForReady();
+            let userOrgData=null;
+            try{userOrgData=await window.fsGetOne("userOrgs",firebaseEmail);}catch(e){}
+            if(!userOrgData||!userOrgData.orgId){
+              const u={username:firebaseEmail,email:firebaseEmail,role:"user",ownerId:""};
+              const existing=S.accounts.find(a=>a.username.toLowerCase()===u.username.toLowerCase());
+              setState({user:u,orgId:null,orgName:null,orgInviteCode:null,accounts:existing?S.accounts:[...S.accounts,u],showAccountMenu:false});
+              return;
+            }
+            const orgId=userOrgData.orgId;
+            let userRecord=null,orgInfo=null;
+            try{userRecord=await window.fsGetOne("orgs/"+orgId+"/users",firebaseEmail);}catch(e){}
+            try{orgInfo=await window.fsGetOne("orgs",orgId);}catch(e){}
+            const u=userRecord
+              ?{username:firebaseEmail,email:firebaseEmail,role:userRecord.role||"user",ownerId:userRecord.ownerId||""}
+              :{username:firebaseEmail,email:firebaseEmail,role:"user",ownerId:""};
+            const existing=S.accounts.find(a=>a.username.toLowerCase()===u.username.toLowerCase());
+            setState({user:u,orgId,orgName:orgInfo?.name||orgId,orgInviteCode:orgInfo?.inviteCode||"",accounts:existing?S.accounts:[...S.accounts,u],showAccountMenu:false});
+            loadData();
+          })
+          .catch(function(err){
+            let msg="Incorrect email or password";
+            if(err.code==="auth/user-not-found"||err.code==="auth/invalid-credential")msg="No account found — check your email or sign up";
+            if(err.code==="auth/wrong-password")msg="Incorrect password";
+            if(err.code==="auth/invalid-email")msg="Invalid email address";
+            if(err.code==="auth/too-many-requests")msg="Too many attempts — try again later";
+            errDiv.innerHTML="<p style='color:#f87171;font-size:13px;text-align:center;margin:6px 0 0'>⚠ "+msg+"</p>";
+            signInBtn.textContent="Sign In →";signInBtn.disabled=false;
+          });
+      }
+
+    // ── NEW USER: create account ──
+    } else if(mode==="newuser"){
+      const hdr=document.createElement("div");
+      hdr.style.cssText="display:flex;align-items:center;gap:10px;margin-bottom:24px;";
+      const back=document.createElement("button");
+      back.style.cssText="background:none;border:none;color:#64748b;font-size:22px;cursor:pointer;padding:0;line-height:1;";
+      back.textContent="←";back.onclick=function(){mode=null;rebuild();};
+      hdr.appendChild(back);
+      const t=document.createElement("h2");
+      t.style.cssText="color:#f1f5f9;font-size:18px;font-weight:700;margin:0;";
+      t.textContent="✨ Create Account";
+      hdr.appendChild(t);
+      card.appendChild(hdr);
+
+      const box=document.createElement("div");
+      box.style.cssText="background:#111827;border-radius:16px;padding:24px;border:1px solid #1e293b;";
+
+      const note=document.createElement("p");
+      note.style.cssText="color:#475569;font-size:12px;margin:0 0 18px;line-height:1.5;";
+      note.textContent="After creating your account you'll choose to start a new inventory (admin) or join an existing one with an invite code.";
+      box.appendChild(note);
+
+      function mkField(labelText,type,placeholder,onInput,onEnter){
+        const lbl=document.createElement("label");
+        lbl.style.cssText="color:#94a3b8;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:6px;";
+        lbl.textContent=labelText;
+        const inp=document.createElement("input");
+        inp.type=type;inp.placeholder=placeholder;
+        inp.style.cssText="width:100%;background:#0f172a;border:1px solid #334155;border-radius:9px;color:#f1f5f9;padding:13px 14px;font-size:15px;font-family:inherit;margin-bottom:14px;box-sizing:border-box;outline:none;";
+        inp.oninput=function(){onInput(this.value);};
+        if(onEnter)inp.onkeydown=function(e){if(e.key==="Enter")onEnter();};
+        box.appendChild(lbl);box.appendChild(inp);
+        return inp;
+      }
+
+      mkField("Email","email","your@email.com",function(v){email=v;},null);
+      mkField("Password","password","At least 6 characters",function(v){password=v;},null);
+      mkField("Confirm Password","password","Repeat password",function(v){confirm=v;},doCreate);
+
+      const errDiv=document.createElement("div");
+      errDiv.style.cssText="min-height:24px;margin-bottom:4px;";
+      box.appendChild(errDiv);
+
+      const createBtn=document.createElement("button");
+      createBtn.style.cssText="width:100%;padding:14px;border-radius:10px;border:none;background:linear-gradient(135deg,#0ea5e9,#6366f1);color:#fff;font-weight:700;font-size:16px;cursor:pointer;font-family:inherit;margin-top:4px;";
+      createBtn.textContent="Create Account →";
+      createBtn.onclick=doCreate;
+      box.appendChild(createBtn);
+      card.appendChild(box);
+
+      function doCreate(){
+        if(!email||!password||!confirm){errDiv.innerHTML="<p style='color:#f87171;font-size:13px;text-align:center;margin:6px 0 0'>⚠ Fill in all fields</p>";return;}
+        if(password!==confirm){errDiv.innerHTML="<p style='color:#f87171;font-size:13px;text-align:center;margin:6px 0 0'>⚠ Passwords don't match</p>";return;}
+        if(password.length<6){errDiv.innerHTML="<p style='color:#f87171;font-size:13px;text-align:center;margin:6px 0 0'>⚠ Password must be at least 6 characters</p>";return;}
+        createBtn.textContent="Creating…";createBtn.disabled=true;
+        window.firebaseCreateUser(email,password)
+          .then(async function(cred){
+            const firebaseEmail=cred.user.email;
+            await fsWaitForReady();
+            // New user — no org yet, go to onboarding
+            const u={username:firebaseEmail,email:firebaseEmail,role:"user",ownerId:""};
+            setState({user:u,orgId:null,orgName:null,orgInviteCode:null,accounts:[...S.accounts,u],showAccountMenu:false});
+          })
+          .catch(function(err){
+            let msg="Could not create account";
+            if(err.code==="auth/email-already-in-use")msg="An account with this email already exists — try signing in";
+            if(err.code==="auth/invalid-email")msg="Invalid email address";
+            if(err.code==="auth/weak-password")msg="Password is too weak — use at least 6 characters";
+            errDiv.innerHTML="<p style='color:#f87171;font-size:13px;text-align:center;margin:6px 0 0'>⚠ "+msg+"</p>";
+            createBtn.textContent="Create Account →";createBtn.disabled=false;
+          });
+      }
+    }
   }
-  div.appendChild(card);return div;
+
+  rebuild();
+  return wrap;
 }
 
 // ── MAIN APP ──────────────────────────────────────────────────────────────────
