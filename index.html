@@ -933,20 +933,39 @@ async function deleteOwner(ownerId){
 
 // ── SETTINGS PANEL ────────────────────────────────────────────────────────────
 function renderSettings(){
+  // Backdrop
   const page=document.createElement("div");
-  page.style.cssText="position:fixed;inset:0;background:#0a0f1c;z-index:1000;overflow-y:auto;-webkit-overflow-scrolling:touch;";
+  page.style.cssText="position:fixed;inset:0;z-index:1000;display:flex;";
+
+  const backdrop=document.createElement("div");
+  backdrop.style.cssText="position:absolute;inset:0;background:rgba(0,0,0,0.5);backdrop-filter:blur(2px);";
+  backdrop.onclick=()=>setState({showSettings:false});
+  page.appendChild(backdrop);
+
+  // Drawer sliding in from the left
+  const drawer=document.createElement("div");
+  drawer.style.cssText="position:relative;width:320px;max-width:88vw;height:100%;background:#0d1424;border-right:1px solid #1e293b;overflow-y:auto;-webkit-overflow-scrolling:touch;z-index:1;display:flex;flex-direction:column;animation:slideInLeft 0.22s cubic-bezier(.4,0,.2,1);";
+
+  // Inject keyframe once
+  if(!document.getElementById("settings-anim-style")){
+    const s=document.createElement("style");
+    s.id="settings-anim-style";
+    s.textContent="@keyframes slideInLeft{from{transform:translateX(-100%)}to{transform:translateX(0)}}";
+    document.head.appendChild(s);
+  }
+
   const inner=document.createElement("div");
-  inner.style.cssText="max-width:480px;margin:0 auto;padding:24px 20px 48px;";
+  inner.style.cssText="padding:20px 18px 60px;flex:1;";
 
   // Header
   const hdr=document.createElement("div");
-  hdr.style.cssText="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;padding-top:8px;";
+  hdr.style.cssText="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;padding-top:4px;";
   const title=document.createElement("h2");
-  title.style.cssText="color:#f1f5f9;font-size:22px;font-weight:800;margin:0;";
+  title.style.cssText="color:#f1f5f9;font-size:18px;font-weight:800;margin:0;";
   title.textContent="⚙️ Settings";
   const closeBtn=document.createElement("button");
-  closeBtn.textContent="✕ Close";
-  closeBtn.style.cssText="background:#1e293b;border:1px solid #334155;color:#94a3b8;font-size:14px;border-radius:8px;padding:8px 14px;cursor:pointer;font-family:inherit;";
+  closeBtn.innerHTML="✕";
+  closeBtn.style.cssText="background:#1e293b;border:1px solid #334155;color:#94a3b8;font-size:16px;border-radius:8px;width:32px;height:32px;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;padding:0;";
   closeBtn.onclick=()=>setState({showSettings:false});
   hdr.appendChild(title);hdr.appendChild(closeBtn);inner.appendChild(hdr);
 
@@ -1143,7 +1162,8 @@ function renderSettings(){
   formCard.appendChild(addBtn);
   inner.appendChild(formCard);
 
-  page.appendChild(inner);
+  drawer.appendChild(inner);
+  page.appendChild(drawer);
   return page;
 }
 
