@@ -739,6 +739,7 @@ function renderOrderSummary(){
 }
 
 function render(){
+  if(!S.scanning) stopScanner();
   const app=document.getElementById("app");
   app.innerHTML="";
   if(!S.user){app.appendChild(renderLogin());return;}
@@ -2578,6 +2579,11 @@ function showInstallBanner() {
   banner.appendChild(btns);
   document.body.appendChild(banner);
 }
+
+// Stop camera when user switches tabs or minimizes the app
+document.addEventListener("visibilitychange", function(){
+  if(document.hidden) stopScanner();
+});
 </script>
 </body>
 </html>
